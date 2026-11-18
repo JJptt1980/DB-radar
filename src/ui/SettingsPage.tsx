@@ -37,8 +37,8 @@ export function SettingsPage() {
         title: ok ? '已開啟持久儲存' : '還是沒有開啟',
         body: ok
           ? '瀏覽器不會再自動清除 DB-radar 的資料。'
-          : notify === 'denied' || notificationPermission() === 'denied'
-            ? '通知權限被封鎖了。可以到 Chrome 的網站設定把 DB-radar 的「通知」改成允許，再按一次。還是不行的話，記得定期匯出備份。'
+          : notify !== 'granted' && notificationPermission() !== 'granted'
+            ? 'Chrome 把通知擋下來了（上方會出現「通知已封鎖」）。點那一列的齒輪，或到 Chrome 選單 → 設定 → 網站設定 → 通知，把 jjptt1980.github.io 改成允許，回來再按一次。'
             : 'Chrome 這次沒有同意。多用幾天後可能會自動開啟；在那之前請記得定期匯出備份。',
       });
     } finally {
