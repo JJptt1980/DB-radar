@@ -25,3 +25,19 @@ export function shouldRecordTrack(
   if (next.ts - prev.ts < intervalSec * 1000) return false;
   return distanceM(prev, next) >= minMoveM;
 }
+
+/** 從 a 看 b 的方位角（度，0 = 北，順時針） */
+export function bearingDeg(a: LatLon, b: LatLon): number {
+  const toRad = Math.PI / 180;
+  const y = Math.sin((b.lon - a.lon) * toRad) * Math.cos(b.lat * toRad);
+  const x =
+    Math.cos(a.lat * toRad) * Math.sin(b.lat * toRad) -
+    Math.sin(a.lat * toRad) * Math.cos(b.lat * toRad) * Math.cos((b.lon - a.lon) * toRad);
+  return (Math.atan2(y, x) / toRad + 360) % 360;
+}
+
+const DIRS = ['北', '東北', '東', '東南', '南', '西南', '西', '西北'];
+
+export function compassLabel(deg: number): string {
+  return DIRS[Math.round((((deg % 360) + 360) % 360) / 45) % 8]!;
+}

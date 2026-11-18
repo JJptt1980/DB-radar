@@ -309,3 +309,26 @@ body {
 .backup-list button.event-row { grid-template-columns: 1fr auto; }
 .radio-row { display: flex; gap: 10px; }
 .radio-row .chip { flex: 1; justify-content: center; }
+
+/* ---------- 雷達 ---------- */
+.radar-page { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
+.radar-card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 14px 18px; }
+.radar-main { font-size: 32px; font-weight: 800; display: flex; align-items: center; gap: 12px; }
+.radar-sub { font-size: 20px; color: var(--accent); margin-top: 6px; }
+.arrow { display: inline-block; font-size: 40px; color: var(--accent); transition: transform 0.4s ease; }
+.radar-wrap { display: flex; justify-content: center; }
+.radar-wrap canvas { touch-action: manipulation; }
+.radar-foot { text-align: center; color: var(--muted); font-size: 15px; margin: 0; }
+.progress { height: 10px; border-radius: 999px; background: var(--line); margin-top: 10px; overflow: hidden; }
+.progress > div { height: 100%; background: var(--accent); }
+
+/* ---------- 統計 ---------- */
+.stats { display: flex; flex-direction: column; gap: 16px; }
+.small { font-size: 14px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 16px; }
+.tbl th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.tbl td { padding: 8px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl td:last-child, .tbl th:last-child { text-align: right; color: var(--accent); }
+.summary.month { grid-template-columns: repeat(3, 1fr); row-gap: 14px; }
+.toggle { display: flex; align-items: center; gap: 12px; min-height: 56px; }
+.toggle input { width: 26px; height: 26px; accent-color: var(--accent); }

@@ -95,6 +95,8 @@ export interface Settings {
   importWeight: number;
   /** Google OAuth 用戶端 ID；空字串 = 用建置時設定的預設值 */
   googleClientId: string;
+  /** 雷達掃描線動畫（純裝飾，關掉省電） */
+  radarSweep: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -112,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   gapBreakMin: 45,
   importWeight: 0.3,
   googleClientId: '',
+  radarSweep: true,
 };
 
 /** Drive 備份狀態，存在 kv（不進備份檔） */

@@ -1,3 +1,4 @@
+import type { ComponentType } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { RecordPage } from './RecordPage';
 import { SettingsPage } from './SettingsPage';
@@ -33,14 +34,10 @@ export function App() {
           <RecordPage />
         ) : tab === 'settings' ? (
           <SettingsPage />
+        ) : tab === 'radar' ? (
+          <Lazy load={() => import('./RadarPage').then((m) => m.RadarPage)} />
         ) : (
-          <section class="placeholder">
-            <div class="placeholder-icon" aria-hidden="true">
-              {current.icon}
-            </div>
-            <p class="placeholder-title">{current.label}頁</p>
-            <p class="placeholder-note">{current.note}</p>
-          </section>
+          <Lazy load={() => import('./StatsPage').then((m) => m.StatsPage)} />
         )}
       </main>
       <nav class="tabbar" aria-label="主要分頁">
@@ -60,4 +57,23 @@ export function App() {
       </nav>
     </div>
   );
+}
+
+/** 雷達頁與統計頁用到 h3-js，等打開時才載入，首頁保持輕巧 */
+function Lazy(props: { load: () => Promise<ComponentType> }) {
+  const [Comp, setComp] = useState<ComponentType | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setComp(null);
+    props
+      .load()
+      .then((c) => alive && setComp(() => c))
+      .catch(() => alive && setErr(true));
+    return () => {
+      alive = false;
+    };
+  }, [props.load.toString()]);
+  if (err) return <p class="muted">載入失敗，請確認網路後重新整理。</p>;
+  return Comp ? <Comp /> : <p class="muted">載入中…</p>;
 }

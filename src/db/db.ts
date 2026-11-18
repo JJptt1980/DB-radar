@@ -46,6 +46,9 @@ export function db(): Promise<IDBPDatabase<RadarDB>> {
 
 export const uuid = (): string => crypto.randomUUID();
 
+/** 開發用假資料的 id 前綴 */
+export const FAKE_PREFIX = 'dev-';
+
 export async function getAllEvents(): Promise<TripEvent[]> {
   return (await db()).getAll('events');
 }
@@ -94,13 +97,15 @@ export async function exportAll(): Promise<BackupFile> {
     d.getAll('importedTrips'),
     getSettings(),
   ]);
+  // 開發用假資料（id 以 dev- 開頭）不進備份
+  const real = <T extends { id: string }>(rows: T[]) => rows.filter((r) => !r.id.startsWith(FAKE_PREFIX));
   return {
     app: 'db-radar',
     schemaVersion: SCHEMA_VERSION,
     exportedAt: Date.now(),
-    events,
-    fares,
-    trackPoints,
+    events: real(events),
+    fares: real(fares),
+    trackPoints: real(trackPoints),
     importedTrips,
     settings,
   };
@@ -181,5 +186,34 @@ export async function replaceAll(b: BackupFile): Promise<number> {
   }
   await tx.objectStore('kv').put({ ...DEFAULT_SETTINGS, ...b.settings }, 'settings');
   await tx.done;
+  return n;
+}
+
+export async function getAllTracks(): Promise<TrackPoint[]> {
+  return (await db()).getAll('trackPoints');
+}
+
+export async function addFakeData(d: { events: TripEvent[]; fares: Fare[]; tracks: TrackPoint[] }): Promise<void> {
+  const tx = (await db()).transaction(['events', 'fares', 'trackPoints'], 'readwrite');
+  const ev = tx.objectStore('events');
+  const fa = tx.objectStore('fares');
+  const tp = tx.objectStore('trackPoints');
+  for (const e of d.events) void ev.put(e);
+  for (const f of d.fares) void fa.put(f);
+  for (const t of d.tracks) void tp.put(t);
+  await tx.done;
+}
+
+/** 只刪掉假資料（id 以 dev- 開頭），真實資料不動 */
+export async function clearFakeData(): Promise<number> {
+  const range = IDBKeyRange.bound(FAKE_PREFIX, FAKE_PREFIX + '\uffff');
+  const tx = (await db()).transaction(['events', 'fares', 'trackPoints'], 'readwrite');
+  const n = await tx.objectStore('events').count(range);
+  await Promise.all([
+    tx.objectStore('events').delete(range),
+    tx.objectStore('fares').delete(range),
+    tx.objectStore('trackPoints').delete(range),
+    tx.done,
+  ]);
   return n;
 }

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { clearAll, countTrackPoints } from '../db/db';
+import { addFakeData, clearAll, clearFakeData, countTrackPoints, saveSettings, FAKE_PREFIX } from '../db/db';
+import { startOfTaipeiDay } from '../domain/time';
+import { lastFix } from '../sensors/gps';
 import { exportToFile, importFromFile } from '../backup/localFile';
 import { BackupFormatError } from '../domain/merge';
 import { Dialog } from './Dialog';
@@ -29,6 +31,47 @@ export function SettingsPage() {
   }, [app.events]);
 
   const liveCount = app.events.filter((e) => !e.deleted).length;
+  const fakeCount = app.events.filter((e) => e.id.startsWith(FAKE_PREFIX)).length;
+
+  const toggleSweep = async (on: boolean) => {
+    await saveSettings({ ...getState().settings, radarSweep: on });
+    await loadAll();
+  };
+
+  const doFake = async () => {
+    setBusy(true);
+    try {
+      if (fakeCount > 0) await clearFakeData();
+      const { generateFake } = await import('../dev/fake');
+      const f = lastFix();
+      const center = f ? { lat: f.lat, lon: f.lon } : getState().settings.homeCenter;
+      const data = generateFake({
+        center,
+        endDay: startOfTaipeiDay(Date.now()),
+        holidays: new Set(getState().settings.holidays),
+        seed: Date.now() % 100000,
+      });
+      await addFakeData(data);
+      await loadAll();
+      setMsg({
+        title: '已產生假資料',
+        body: `${data.events.filter((e) => e.type === 'dropoff').length} 趟、${data.tracks.length} 個軌跡點，中心在${f ? '目前位置' : '預設中心（台北車站）'}。`,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doClearFake = async () => {
+    setBusy(true);
+    try {
+      const n = await clearFakeData();
+      await loadAll();
+      setMsg({ title: '已清除假資料', body: `刪除 ${n} 筆假事件，真實記錄沒有動。` });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const doRetryPersist = async () => {
     setBusy(true);
@@ -112,6 +155,18 @@ export function SettingsPage() {
       <DriveCard />
 
       <section class="card">
+        <h2>雷達</h2>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={app.settings.radarSweep}
+            onChange={(e) => void toggleSweep(e.currentTarget.checked)}
+          />
+          <span>掃描線動畫（純裝飾，關掉比較省電）</span>
+        </label>
+      </section>
+
+      <section class="card">
         <h2>本機匯出／匯入</h2>
         <p class="muted">匯出成 .json.gz 檔，可以存到雲端硬碟或傳給自己。匯入時會合併，不會覆蓋較新的資料。</p>
         <div class="btn-col">
@@ -138,6 +193,20 @@ export function SettingsPage() {
 
       <section class="card">
         <h2>開發模式</h2>
+        <p class="muted">
+          假資料：以目前位置為中心產生 60 天的模擬記錄，讓雷達和統計頁有東西看。假資料不會備份到 Google Drive，可以單獨清除，不會動到真實記錄。
+          {fakeCount > 0 && `目前有 ${fakeCount} 筆假事件。`}
+        </p>
+        <div class="btn-col">
+          <button type="button" class="btn secondary" disabled={busy} onClick={() => void doFake()}>
+            產生假資料
+          </button>
+          {fakeCount > 0 && (
+            <button type="button" class="btn secondary" disabled={busy} onClick={() => void doClearFake()}>
+              清除假資料
+            </button>
+          )}
+        </div>
         <p class="muted">清空手機上的所有 DB-radar 資料。請先匯出備份，清空後無法復原。</p>
         <button type="button" class="btn danger" onClick={() => setClearStep(1)}>
           清空資料庫

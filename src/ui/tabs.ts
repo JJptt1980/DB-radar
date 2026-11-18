@@ -9,8 +9,8 @@ export interface TabDef {
 
 export const TABS: readonly TabDef[] = [
   { id: 'record', label: '記錄', icon: '●', note: '' },
-  { id: 'radar', label: '雷達', icon: '◎', note: 'Phase 3 會在這裡顯示熱點雷達。' },
-  { id: 'stats', label: '統計', icon: '▤', note: 'Phase 3 會在這裡顯示時段與地點排行。' },
+  { id: 'radar', label: '雷達', icon: '◎', note: '' },
+  { id: 'stats', label: '統計', icon: '▤', note: '' },
   { id: 'settings', label: '設定', icon: '⚙', note: '' },
 ];
 
