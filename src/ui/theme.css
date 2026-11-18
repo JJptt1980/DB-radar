@@ -301,3 +301,11 @@ body {
 .suggest-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
 .field small { color: var(--muted); font-size: 14px; line-height: 1.4; }
 .field.invalid input { border-color: var(--danger); outline: 2px solid var(--danger); }
+
+/* ---------- 備份 ---------- */
+.warn-toast { border-color: var(--warn); background: rgba(255, 201, 74, 0.1); }
+.link-chip { display: inline-flex; align-items: center; text-decoration: none; }
+.backup-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.backup-list button.event-row { grid-template-columns: 1fr auto; }
+.radio-row { display: flex; gap: 10px; }
+.radio-row .chip { flex: 1; justify-content: center; }

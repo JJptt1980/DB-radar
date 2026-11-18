@@ -3,7 +3,7 @@ import { exportAll, mergeImport, type ImportResult } from '../db/db';
 import { parseBackup, BackupFormatError } from '../domain/merge';
 import { backupFileName } from '../domain/time';
 
-async function gzip(text: string): Promise<Blob> {
+export async function gzip(text: string): Promise<Blob> {
   const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
   return new Response(stream).blob();
 }

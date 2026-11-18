@@ -1,6 +1,8 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import {
+  DEFAULT_BACKUP_META,
   DEFAULT_SETTINGS,
+  type BackupMeta,
   SCHEMA_VERSION,
   type BackupFile,
   type Fare,
@@ -152,4 +154,32 @@ export async function getAllImportedTrips(): Promise<ImportedTrip[]> {
 export async function putImportedTrips(trips: readonly ImportedTrip[]): Promise<void> {
   const tx = (await db()).transaction('importedTrips', 'readwrite');
   await Promise.all([...trips.map((t) => tx.store.put(t)), tx.done]);
+}
+
+export async function getBackupMeta(): Promise<BackupMeta> {
+  const m = (await (await db()).get('kv', 'backupMeta')) as Partial<BackupMeta> | undefined;
+  return { ...DEFAULT_BACKUP_META, ...m };
+}
+
+export async function saveBackupMeta(m: BackupMeta): Promise<void> {
+  await (await db()).put('kv', m, 'backupMeta');
+}
+
+/** 覆蓋還原：清掉事件、車資、軌跡、匯入行程與設定，換成備份檔的內容（Drive 連結狀態保留）。 */
+export async function replaceAll(b: BackupFile): Promise<number> {
+  const d = await db();
+  const tx = d.transaction(['events', 'fares', 'trackPoints', 'importedTrips', 'kv'], 'readwrite');
+  const stores = ['events', 'fares', 'trackPoints', 'importedTrips'] as const;
+  let n = 0;
+  for (const name of stores) {
+    const store = tx.objectStore(name);
+    await store.clear();
+    for (const rec of b[name]) {
+      await store.put(rec as never);
+      n++;
+    }
+  }
+  await tx.objectStore('kv').put({ ...DEFAULT_SETTINGS, ...b.settings }, 'settings');
+  await tx.done;
+  return n;
 }

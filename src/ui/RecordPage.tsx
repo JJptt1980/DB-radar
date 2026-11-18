@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { EventType, TripEvent } from '../db/types';
 import { EVENT_LABEL, STATE_LABEL, allowedActions, liveEvents, shiftSummary } from '../domain/state';
 import { fmtDuration, fmtTime, startOfTaipeiDay } from '../domain/time';
+import { needsBackupReminder } from '../backup/policy';
 import { gpsStatus, lastFix, onFix, onGpsStatus } from '../sensors/gps';
 import { useWakeLock } from '../sensors/wakeLock';
 import { Dialog } from './Dialog';
@@ -10,6 +11,7 @@ import { FareForm } from './FareForm';
 import {
   DECLINE_PROMPT_MS,
   UNDO_MS,
+  backupByUser,
   dismissDeclinePrompt,
   openFareForm,
   press,
@@ -93,6 +95,21 @@ export function RecordPage() {
 
   const fareFor = app.fareFormFor ? app.fares.get(app.fareFormFor) : null;
 
+  const notice = app.notice && now - app.notice.at < 8_000 ? app.notice : null;
+  const meta = app.backup;
+  const firstDataAt = live[0]?.ts ?? null;
+  const backupWarn =
+    state !== 'offline'
+      ? null
+      : meta?.pending
+        ? '有資料還沒備份到 Google Drive'
+        : needsBackupReminder(meta?.lastBackupAt ?? null, firstDataAt, now)
+          ? meta?.linked
+            ? '超過 3 天沒有備份到 Google Drive'
+            : '還沒設定 Google Drive 備份'
+          : null;
+  const [backingUp, setBackingUp] = useState(false);
+
   if (!app.loaded) return <p class="muted">載入中…</p>;
 
   return (
@@ -120,6 +137,31 @@ export function RecordPage() {
         )}
         <GpsLine status={gps.status} accuracy={gps.fix?.accuracy ?? null} />
       </section>
+
+      {notice && <section class={notice.bad ? 'toast warn-toast' : 'toast'}>{notice.text}</section>}
+
+      {backupWarn && (
+        <section class="toast warn-toast">
+          <span>{backupWarn}</span>
+          {meta?.linked ? (
+            <button
+              type="button"
+              class="chip"
+              disabled={backingUp}
+              onClick={() => {
+                setBackingUp(true);
+                void backupByUser().finally(() => setBackingUp(false));
+              }}
+            >
+              {backingUp ? '備份中…' : '現在備份'}
+            </button>
+          ) : (
+            <a class="chip link-chip" href="#settings">
+              去設定
+            </a>
+          )}
+        </section>
+      )}
 
       <section class="actions">
         {primary.map((a) => (

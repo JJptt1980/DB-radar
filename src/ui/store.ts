@@ -10,7 +10,7 @@ import {
   putFare,
   uuid,
 } from '../db/db';
-import { DEFAULT_SETTINGS, type DeclineReason, type EventType, type Fare, type Settings, type TripEvent } from '../db/types';
+import { DEFAULT_SETTINGS, type BackupMeta, type DeclineReason, type EventType, type Fare, type Settings, type TripEvent } from '../db/types';
 import { currentStatus, transition, type CurrentStatus } from '../domain/state';
 import { shouldRecordTrack } from '../domain/geo';
 import { freshFix, lastFix, onFix, startGps, stopGps } from '../sensors/gps';
@@ -20,6 +20,8 @@ import {
   type NotifyPermission,
   type PersistState,
 } from '../sensors/storage';
+import { autoBackup, backupNow, clientIdFrom, onMeta, resumeOnStart } from '../backup/sync';
+import { hasToken } from '../backup/drive';
 
 export const UNDO_MS = 10_000;
 export const DECLINE_PROMPT_MS = 5_000;
@@ -37,6 +39,9 @@ export interface AppState {
   declinePrompt: { eventId: string; at: number } | null;
   /** 正在填哪一筆下客的車資 */
   fareFormFor: string | null;
+  backup: BackupMeta | null;
+  /** 記錄頁上方的短訊息（例如「已備份到 Google Drive」） */
+  notice: { text: string; at: number; bad?: boolean } | null;
 }
 
 let state: AppState = {
@@ -49,6 +54,8 @@ let state: AppState = {
   undo: null,
   declinePrompt: null,
   fareFormFor: null,
+  backup: null,
+  notice: null,
 };
 
 const listeners = new Set<() => void>();
@@ -96,6 +103,12 @@ export async function init(): Promise<void> {
   await loadAll();
   lastTrack = await lastTrackPoint();
   void ensurePersisted().then((persist) => set({ persist }));
+  onMeta((backup) => set({ backup }));
+  void resumeOnStart(clientId());
+  addEventListener('online', () => {
+    // 有網路了：如果還有待備份、而且權杖還有效，就安靜補做（不跳登入畫面）
+    if (state.backup?.pending && hasToken()) void backupNow(clientId(), false).catch(() => undefined);
+  });
   startGps();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') startGps();
@@ -112,6 +125,22 @@ export async function init(): Promise<void> {
       tracking = false;
     });
   });
+}
+
+export const clientId = (): string => clientIdFrom(state.settings.googleClientId);
+
+export function notify(text: string, bad = false): void {
+  set({ notice: { text, at: Date.now(), bad } });
+}
+
+/** 使用者點「現在備份」：可以跳出 Google 登入 */
+export async function backupByUser(): Promise<void> {
+  try {
+    const r = await backupNow(clientId(), true);
+    notify(`已備份到 Google Drive（${r.name}）`);
+  } catch (e) {
+    notify(`備份失敗：${e instanceof Error ? e.message : String(e)}`, true);
+  }
 }
 
 export async function retryPersist(): Promise<NotifyPermission> {
@@ -167,6 +196,12 @@ async function recordPress(type: EventType, shiftId: string | null, now: number)
     patch.fareFormFor = ev.id;
   }
   set(patch);
+  if (type === 'offline') {
+    void autoBackup(clientId()).then((r) => {
+      if (r === 'done') notify('已自動備份到 Google Drive');
+      else if (r === 'pending') notify('這一班還沒備份到 Google Drive，有網路時點「現在備份」', true);
+    });
+  }
   return ev;
 }
 

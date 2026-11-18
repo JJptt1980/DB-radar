@@ -27,6 +27,8 @@ jobs:
       - run: npm test
       - run: python3 -m unittest discover -s tests -p '*_test.py'
       - run: npm run build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

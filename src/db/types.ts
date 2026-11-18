@@ -93,6 +93,8 @@ export interface Settings {
   fareIncludesSurgeVerified: boolean;
   gapBreakMin: number;
   importWeight: number;
+  /** Google OAuth 用戶端 ID；空字串 = 用建置時設定的預設值 */
+  googleClientId: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -109,6 +111,27 @@ export const DEFAULT_SETTINGS: Settings = {
   fareIncludesSurgeVerified: true,
   gapBreakMin: 45,
   importWeight: 0.3,
+  googleClientId: '',
+};
+
+/** Drive 備份狀態，存在 kv（不進備份檔） */
+export interface BackupMeta {
+  linked: boolean;
+  folderId: string | null;
+  lastBackupAt: number | null;
+  lastBackupName: string | null;
+  /** 有資料還沒備份成功（例如下線時沒網路或需要重新登入） */
+  pending: boolean;
+  lastError: string | null;
+}
+
+export const DEFAULT_BACKUP_META: BackupMeta = {
+  linked: false,
+  folderId: null,
+  lastBackupAt: null,
+  lastBackupName: null,
+  pending: false,
+  lastError: null,
 };
 
 export interface BackupFile {

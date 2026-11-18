@@ -4,6 +4,7 @@ import { exportToFile, importFromFile } from '../backup/localFile';
 import { BackupFormatError } from '../domain/merge';
 import { Dialog } from './Dialog';
 import { VideoImportCard } from './VideoImport';
+import { DriveCard } from './DriveCard';
 import { isStandalone, notificationPermission } from '../sensors/storage';
 import { getState, loadAll, retryPersist, useAppState } from './store';
 
@@ -11,7 +12,7 @@ const getPersist = () => getState().persist;
 
 const PERSIST_TEXT = {
   granted: '已開啟：瀏覽器不會自動清除資料',
-  denied: '未開啟：瀏覽器空間不足時可能清除資料，請記得定期匯出備份',
+  denied: '未開啟：瀏覽器空間不足時可能清除資料，請開啟 Google Drive 備份',
   unsupported: '這個瀏覽器不支援持久儲存，請記得定期匯出備份',
 };
 
@@ -107,6 +108,8 @@ export function SettingsPage() {
           </>
         )}
       </section>
+
+      <DriveCard />
 
       <section class="card">
         <h2>本機匯出／匯入</h2>
