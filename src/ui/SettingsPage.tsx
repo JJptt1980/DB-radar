@@ -3,7 +3,10 @@ import { clearAll, countTrackPoints } from '../db/db';
 import { exportToFile, importFromFile } from '../backup/localFile';
 import { BackupFormatError } from '../domain/merge';
 import { Dialog } from './Dialog';
-import { loadAll, useAppState } from './store';
+import { isStandalone, notificationPermission } from '../sensors/storage';
+import { getState, loadAll, retryPersist, useAppState } from './store';
+
+const getPersist = () => getState().persist;
 
 const PERSIST_TEXT = {
   granted: '已開啟：瀏覽器不會自動清除資料',
@@ -24,6 +27,24 @@ export function SettingsPage() {
   }, [app.events]);
 
   const liveCount = app.events.filter((e) => !e.deleted).length;
+
+  const doRetryPersist = async () => {
+    setBusy(true);
+    try {
+      const notify = await retryPersist();
+      const ok = getPersist() === 'granted';
+      setMsg({
+        title: ok ? '已開啟持久儲存' : '還是沒有開啟',
+        body: ok
+          ? '瀏覽器不會再自動清除 DB-radar 的資料。'
+          : notify === 'denied' || notificationPermission() === 'denied'
+            ? '通知權限被封鎖了。可以到 Chrome 的網站設定把 DB-radar 的「通知」改成允許，再按一次。還是不行的話，記得定期匯出備份。'
+            : 'Chrome 這次沒有同意。多用幾天後可能會自動開啟；在那之前請記得定期匯出備份。',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const doExport = async () => {
     setBusy(true);
@@ -72,6 +93,18 @@ export function SettingsPage() {
         <p class={app.persist === 'granted' ? 'ok' : 'warn'}>
           持久儲存：{app.persist ? PERSIST_TEXT[app.persist] : '檢查中…'}
         </p>
+        <p class="muted">開啟方式：{isStandalone() ? '主畫面圖示' : '瀏覽器分頁（建議改從主畫面圖示開啟）'}</p>
+        {app.persist === 'denied' && (
+          <>
+            <p class="muted">
+              Chrome 不會詢問，而是自己判斷要不要開啟。網站有通知權限時通常就會開啟。DB-radar
+              不會發送任何通知，只是借用這個條件。
+            </p>
+            <button type="button" class="btn secondary" disabled={busy} onClick={() => void doRetryPersist()}>
+              再申請一次持久儲存
+            </button>
+          </>
+        )}
       </section>
 
       <section class="card">

@@ -14,7 +14,12 @@ import { DEFAULT_SETTINGS, type DeclineReason, type EventType, type Fare, type S
 import { currentStatus, transition, type CurrentStatus } from '../domain/state';
 import { shouldRecordTrack } from '../domain/geo';
 import { freshFix, lastFix, onFix, startGps, stopGps } from '../sensors/gps';
-import { ensurePersisted, type PersistState } from '../sensors/storage';
+import {
+  ensurePersisted,
+  retryPersistWithNotification,
+  type NotifyPermission,
+  type PersistState,
+} from '../sensors/storage';
 
 export const UNDO_MS = 10_000;
 export const DECLINE_PROMPT_MS = 5_000;
@@ -107,6 +112,12 @@ export async function init(): Promise<void> {
       tracking = false;
     });
   });
+}
+
+export async function retryPersist(): Promise<NotifyPermission> {
+  const r = await retryPersistWithNotification();
+  set({ persist: r.persist });
+  return r.notify;
 }
 
 /** 兩次按鈕至少間隔多久。下一顆主按鈕會出現在同一個位置，避免連點直接記到下一步。 */
