@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
+import { RecordPage } from './RecordPage';
+import { SettingsPage } from './SettingsPage';
 import { TABS, type TabId, parseTab } from './tabs';
 
 export function App() {
@@ -27,13 +29,19 @@ export function App() {
         {!online && <span class="badge">離線中</span>}
       </header>
       <main class="page">
-        <section class="placeholder">
-          <div class="placeholder-icon" aria-hidden="true">
-            {current.icon}
-          </div>
-          <p class="placeholder-title">{current.label}頁</p>
-          <p class="placeholder-note">{current.note}</p>
-        </section>
+        {tab === 'record' ? (
+          <RecordPage />
+        ) : tab === 'settings' ? (
+          <SettingsPage />
+        ) : (
+          <section class="placeholder">
+            <div class="placeholder-icon" aria-hidden="true">
+              {current.icon}
+            </div>
+            <p class="placeholder-title">{current.label}頁</p>
+            <p class="placeholder-note">{current.note}</p>
+          </section>
+        )}
       </main>
       <nav class="tabbar" aria-label="主要分頁">
         {TABS.map((t) => (
