@@ -198,3 +198,38 @@ describe('統計頁', () => {
     expect(d.avgWaitMin).not.toBeNull();
   });
 });
+
+import { heatCells, heatColor, scaleRange, viewFor } from '../src/analytics/heat';
+
+describe('地圖熱力圖', () => {
+  const fake = generateFake({ center: C, endDay: Date.UTC(2026, 10, 19, 16), days: 60, seed: 7 });
+  const st = buildStats({ events: fake.events, fares: new Map(fake.fares.map((f) => [f.id, f])), tracks: fake.tracks, imported: [], settings: S });
+
+  it('週五 22 點最熱的六角形在夜生活區', () => {
+    const cells = heatCells(st, 'fri', 22, S);
+    const night = zoneCenter(C, ZONES.find((z) => z.name === '夜生活區')!);
+    const [lat, lon] = cellToLatLng(cells[0]!.cell);
+    expect(distanceM(night, { lat, lon })).toBeLessThan(1200);
+    expect(cells[0]!.boundary.length).toBe(6);
+  });
+
+  it('「全部」把所有槽位加總；整天比單一小時有更多格子', () => {
+    const all = viewFor(st, 'all', 'all');
+    let idle = 0;
+    for (const m of st.cells.values()) for (const a of m.values()) idle += a.idleHours;
+    expect(all.city.idleHours).toBeCloseTo(idle);
+    expect(heatCells(st, 'fri', 'all', S).length).toBeGreaterThanOrEqual(heatCells(st, 'fri', 22, S).length);
+  });
+
+  it('色階與範圍', () => {
+    expect(heatColor(0)).toBe('rgb(30, 90, 110)');
+    expect(heatColor(1)).toBe('rgb(235, 60, 50)');
+    expect(heatColor(2)).toBe(heatColor(1));
+    const [lo, hi] = scaleRange([1, 2, 3, 4, 5, 6, 7, 8, 9, 100]);
+    expect(lo).toBe(2);
+    expect(hi).toBe(9);
+    expect(scaleRange([])).toEqual([0, 1]);
+    const [a, b] = scaleRange([5, 5, 5]);
+    expect(b).toBeGreaterThan(a);
+  });
+});

@@ -1,5 +1,7 @@
 // 統計頁（SPEC 5.3 Phase 3）：表格版。地圖熱力圖是 Phase 4。
-import { useMemo } from 'preact/hooks';
+import type { ComponentType } from 'preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import type { StatsIndex } from '../analytics/stats';
 import { slotLabel } from '../analytics/slots';
 import { bestCells, bestSlots, declineStats, monthly, weekly, type Period } from '../analytics/summary';
 import { bearingDeg, compassLabel, distanceM } from '../domain/geo';
@@ -29,10 +31,47 @@ export function StatsPage() {
 
   }, [index, app.events, app.fares, app.settings]);
 
-  if (!data) return <p class="muted">{loading ? '計算中…' : '還沒有資料'}</p>;
+  const [view, setView] = useState<'map' | 'table'>(() => {
+    try {
+      return localStorage.getItem('dbradar-stats-view') === 'table' ? 'table' : 'map';
+    } catch {
+      return 'map';
+    }
+  });
+  const choose = (v: 'map' | 'table') => {
+    setView(v);
+    try {
+      localStorage.setItem('dbradar-stats-view', v);
+    } catch {
+      // 記不住就算了
+    }
+  };
+
+  if (!data || !index) return <p class="muted">{loading ? '計算中…' : '還沒有資料'}</p>;
+
+  const switcher = (
+    <div class="radio-row seg">
+      <button type="button" class={view === 'map' ? 'chip active' : 'chip'} onClick={() => choose('map')}>
+        地圖
+      </button>
+      <button type="button" class={view === 'table' ? 'chip active' : 'chip'} onClick={() => choose('table')}>
+        表格
+      </button>
+    </div>
+  );
+
+  if (view === 'map') {
+    return (
+      <div class="stats">
+        {switcher}
+        <MapLoader index={index} />
+      </div>
+    );
+  }
 
   return (
     <div class="stats">
+      {switcher}
       <section class="card">
         <h2>本月總覽</h2>
         {data.month ? <MonthCard p={data.month} /> : <p class="muted">這個月還沒有記錄。</p>}
@@ -93,7 +132,7 @@ export function StatsPage() {
 
       <section class="card">
         <h2>最佳地點</h2>
-        <p class="muted small">不分時段；方向與距離是從目前位置算。地圖版在下一階段。</p>
+        <p class="muted small">不分時段；方向與距離是從目前位置算。</p>
         <table class="tbl">
           <thead>
             <tr>
@@ -173,4 +212,17 @@ function MonthCard(props: { p: Period }) {
       </div>
     </div>
   );
+}
+
+/** Leaflet 只有打開地圖時才載入 */
+function MapLoader(props: { index: StatsIndex }) {
+  const [Comp, setComp] = useState<ComponentType<{ index: StatsIndex }> | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    import('./HeatMap')
+      .then((m) => setComp(() => m.HeatMap))
+      .catch(() => setErr(true));
+  }, []);
+  if (err) return <p class="muted">地圖載入失敗，請確認網路後重新整理。</p>;
+  return Comp ? <Comp index={props.index} /> : <p class="muted">地圖載入中…</p>;
 }

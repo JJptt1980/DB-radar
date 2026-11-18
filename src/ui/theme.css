@@ -332,3 +332,19 @@ body {
 .summary.month { grid-template-columns: repeat(3, 1fr); row-gap: 14px; }
 .toggle { display: flex; align-items: center; gap: 12px; min-height: 56px; }
 .toggle input { width: 26px; height: 26px; accent-color: var(--accent); }
+
+/* ---------- 地圖 ---------- */
+.seg .chip { flex: 1; justify-content: center; }
+.heat { display: flex; flex-direction: column; gap: 12px; }
+.day-chips .chip { min-height: 44px; padding: 0 14px; }
+.hour-row { display: flex; align-items: center; gap: 14px; }
+.hour-slider { flex: 1; accent-color: var(--accent); height: 32px; }
+.hour-label { min-width: 3.5em; text-align: right; font-size: 20px; }
+.map { height: 58dvh; min-height: 320px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #111; }
+.leaflet-container { font: inherit; background: #111; }
+.dark-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
+.leaflet-control-attribution { background: rgba(0, 0, 0, 0.6) !important; color: #bbb !important; }
+.leaflet-control-attribution a { color: #9cd; }
+.legend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.legend-bar { flex: 1; min-width: 120px; height: 12px; border-radius: 999px;
+  background: linear-gradient(90deg, rgb(30, 90, 110), rgb(40, 170, 90), rgb(230, 220, 60), rgb(245, 150, 40), rgb(235, 60, 50)); }
