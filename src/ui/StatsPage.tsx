@@ -15,7 +15,7 @@ const REASON = { too_far: '太遠', low_fare: '車資低', wrong_direction: '方
 
 export function StatsPage() {
   const app = useAppState();
-  const { index, loading } = useAnalytics();
+  const { index, loading, official } = useAnalytics();
   const now = Date.now();
   const from = lastFix() ?? app.settings.homeCenter;
 
@@ -24,12 +24,12 @@ export function StatsPage() {
     return {
       slots: bestSlots(index, app.settings),
       cells: bestCells(index, app.settings),
-      weeks: weekly(app.events, app.fares, app.settings, now),
-      month: monthly(app.events, app.fares, app.settings, now)[0] ?? null,
+      weeks: weekly(app.events, app.fares, app.settings, now, 8, official ?? undefined),
+      month: monthly(app.events, app.fares, app.settings, now, official ?? undefined)[0] ?? null,
       decline: declineStats(app.events),
     };
 
-  }, [index, app.events, app.fares, app.settings]);
+  }, [index, official, app.events, app.fares, app.settings]);
 
   const [view, setView] = useState<'map' | 'table'>(() => {
     try {

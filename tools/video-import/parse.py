@@ -386,16 +386,18 @@ def build_trips(observations: list[Observation], year: int, now_ms: int) -> list
         pickup = vote([o.pickup for o in obs], [o.conf['pickup'] for o in obs])
         dropoff = vote([o.dropoff for o in obs], [o.conf['dropoff'] for o in obs])
         hh, mm = map(int, start.split(':'))
-        pickup_ts = int(datetime(year, month, day, hh, mm, tzinfo=TAIPEI).timestamp() * 1000)
+        # 卡片上的時間是接單時間（2026-11-19 對照 Uber 官方資料確認，不是上客時間）
+        request_ts = int(datetime(year, month, day, hh, mm, tzinfo=TAIPEI).timestamp() * 1000)
         key = dedupe_key(date_str, start, fare, distance)
         trips.append({
             'id': 'vid_' + hashlib.sha1(key.encode()).hexdigest()[:12],
             'source': 'video',
             'externalId': None,
             'dedupeKey': key,
-            'requestTs': None,
-            'pickupTs': pickup_ts,
-            'dropoffTs': pickup_ts + duration * 1000,
+            'requestTs': request_ts,
+            # 上客、下客時間影片看不出來（接駁時間未知），App 匯入 Uber 官方資料後會補上
+            'pickupTs': None,
+            'dropoffTs': None,
             'durationSec': duration,
             'distanceKm': distance,
             'pickupLat': None,
@@ -420,11 +422,12 @@ def build_trips(observations: list[Observation], year: int, now_ms: int) -> list
             'updatedAt': now_ms,
         })
 
-    trips.sort(key=lambda t: t['pickupTs'])
+    trips.sort(key=lambda t: t['requestTs'])
     # 空檔（8.5）：同一天才算，保留一位小數
     for prev, cur in zip(trips, trips[1:]):
         if prev['dedupeKey'][:10] == cur['dedupeKey'][:10]:
-            gap = (cur['pickupTs'] - prev['dropoffTs']) / 60000
+            # 空檔 = 這一趟接單 −（上一趟接單 ＋ 行程時長）；上一趟的接駁時間未知，所以會略為高估
+            gap = (cur['requestTs'] - (prev['requestTs'] + prev['durationSec'] * 1000)) / 60000
             cur['raw']['gapBeforeMin'] = f'{round(gap + 1e-9, 1):.1f}'
     return trips
 

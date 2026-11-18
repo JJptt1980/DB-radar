@@ -1,4 +1,5 @@
 import { SCHEMA_VERSION, type BackupFile } from '../db/types';
+import { migrateBackup } from './migrate';
 
 export interface Versioned {
   id: string;
@@ -49,7 +50,7 @@ export function parseBackup(data: unknown): BackupFile {
     }
     return x;
   };
-  return {
+  return migrateBackup({
     app: 'db-radar',
     schemaVersion: v,
     exportedAt: typeof d.exportedAt === 'number' ? d.exportedAt : 0,
@@ -57,6 +58,7 @@ export function parseBackup(data: unknown): BackupFile {
     fares: arr('fares'),
     trackPoints: arr('trackPoints'),
     importedTrips: arr('importedTrips'),
+    importedIdle: arr('importedIdle'),
     settings: (d.settings && typeof d.settings === 'object' ? d.settings : {}) as BackupFile['settings'],
-  };
+  });
 }

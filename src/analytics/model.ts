@@ -60,15 +60,25 @@ const sumAcc = (m: Iterable<Acc>): Acc => {
   return t;
 };
 
-/** 0.6 × 本小時 + 0.2 × 前一小時 + 0.2 × 下一小時（同日型），在原始累計量上混合 */
-export function viewAt(index: StatsIndex, slot: Slot): SlotView {
+/**
+ * 0.6 × 本小時 + 0.2 × 前一小時 + 0.2 × 下一小時（同日型），在原始累計量上混合。
+ * 全城層 = 有地點的資料加總 ＋ importWeight × 官方資料裡沒有地點的部分。
+ */
+export function viewAt(index: StatsIndex, slot: Slot, importWeight = 0.3): SlotView {
   const [prev, next] = adjacentSlots(slot);
   const order = [slot, prev, next];
   const cells = blendMaps(order.map((s) => index.cells.get(s)), emptyAcc, addInto);
   const video = blendMaps(order.map((s) => index.video.get(s)), emptyVideo, addVideo);
+  const city = sumAcc(cells.values());
+  order.forEach((s, i) => {
+    const o = index.official?.get(s);
+    if (o) addInto(city, o, BLEND[i]! * importWeight);
+  });
   const all: Acc[] = [];
   for (const m of index.cells.values()) all.push(...m.values());
-  return { slot, cells, video, city: sumAcc(cells.values()), cityAll: sumAcc(all) };
+  const cityAll = sumAcc(all);
+  for (const o of index.official?.values() ?? []) addInto(cityAll, o, importWeight);
+  return { slot, cells, video, city, cityAll };
 }
 
 export type Confidence = 'low' | 'mid' | 'high';
@@ -190,7 +200,7 @@ export function scoreCell(est: CellEstimate, from: LatLon, here: boolean, settin
 
 /** 雷達推薦（4.5）：範圍內每個資料夠的格子，加上原地不動，依預期時薪排序 */
 export function recommend(index: StatsIndex, slot: Slot, from: LatLon, settings: Settings): Recommendation {
-  const view = viewAt(index, slot);
+  const view = viewAt(index, slot, settings.importWeight);
   const hereCell = latLngToCell(from.lat, from.lon, index.res);
   const here = scoreCell(estimate(view, hereCell, settings), from, true, settings);
   const candidates: Candidate[] = [here];

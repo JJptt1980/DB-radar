@@ -11,9 +11,9 @@ function trip(id: string, minute: number, extra: Partial<ImportedTrip> = {}): Im
     source: 'video',
     externalId: null,
     dedupeKey: `2026-11-18|${id}`,
-    requestTs: null,
-    pickupTs: T + minute * MIN,
-    dropoffTs: T + (minute + 10) * MIN,
+    requestTs: T + minute * MIN,
+    pickupTs: null,
+    dropoffTs: null,
     durationSec: 600,
     distanceKm: 3,
     pickupLat: null,
@@ -78,8 +78,8 @@ describe('planVideoImport', () => {
     expect(second.skipped).toBe(2);
   });
 
-  it('和 3 分鐘內的上客配對，車資還在待補時建議補上', () => {
-    const events = [ev('on', 'online', -20), ev('acc', 'accept', -5), ev('pk', 'pickup', 2), ev('dr', 'dropoff', 12)];
+  it('和 3 分鐘內的接單配對（卡片時間是接單時間），車資還在待補時建議補上', () => {
+    const events = [ev('on', 'online', -20), ev('acc', 'accept', 1), ev('pk', 'pickup', 8), ev('dr', 'dropoff', 18)];
     const fares = new Map<string, Fare>([
       ['dr', { id: 'dr', fare: null, surge: null, tip: null, note: '', pending: true, updatedAt: 0 }],
     ]);
@@ -89,8 +89,8 @@ describe('planVideoImport', () => {
     expect(plan.fareSuggestions).toEqual([{ eventId: 'dr', tripId: 'a', fare: 200, surge: 30 }]);
   });
 
-  it('超過 3 分鐘不配對；車資已填就不建議', () => {
-    const events = [ev('pk', 'pickup', 4), ev('dr', 'dropoff', 14)];
+  it('超過 3 分鐘不配對；車資已填就不建議；接單後取消的不配對', () => {
+    const events = [ev('acc', 'accept', 4), ev('pk', 'pickup', 9), ev('dr', 'dropoff', 14)];
     expect(planVideoImport(file([trip('a', 0)]), [], events, new Map(), 0).matched).toBe(0);
     const fares = new Map<string, Fare>([
       ['dr', { id: 'dr', fare: 180, surge: 0, tip: null, note: '', pending: false, updatedAt: 0 }],
@@ -98,5 +98,13 @@ describe('planVideoImport', () => {
     const plan = planVideoImport(file([trip('a', 2)]), [], events, fares, 0);
     expect(plan.matched).toBe(1);
     expect(plan.fareSuggestions).toEqual([]);
+    const cancelled = [ev('acc', 'accept', 0), ev('cx', 'cancel', 3), ev('dr', 'dropoff', 30)];
+    expect(planVideoImport(file([trip('a', 0)]), [], cancelled, new Map(), 0).matched).toBe(0);
+  });
+
+  it('舊格式（v1）的影片匯入檔：卡片時間從 pickupTs 搬到 requestTs', () => {
+    const old = { ...trip('a', 0), requestTs: null, pickupTs: T, dropoffTs: T + 600_000 };
+    const f = parseVideoImport({ app: 'db-radar', kind: 'video-import', schemaVersion: 1, importedTrips: [old] });
+    expect([f.trips[0]!.requestTs, f.trips[0]!.pickupTs, f.trips[0]!.dropoffTs]).toEqual([T, null, null]);
   });
 });

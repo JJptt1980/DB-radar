@@ -359,7 +359,7 @@ def main() -> int:
     out = {
         'app': 'db-radar',
         'kind': 'video-import',
-        'schemaVersion': 1,
+        'schemaVersion': 2,
         'exportedAt': now_ms,
         'sourceVideo': video.name,
         'importedTrips': trips,

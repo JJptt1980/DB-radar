@@ -1,6 +1,6 @@
 // 統計頁的表格（SPEC 5.3 Phase 3 版）：最佳時段、最佳格子、每週時薪、本月總覽、挑單分析。純函式。
 import { cellToLatLng } from 'h3-js';
-import type { DeclineReason, Fare, Settings, TripEvent } from '../db/types';
+import type { DeclineReason, Fare, ImportedIdle, ImportedTrip, Settings, TripEvent } from '../db/types';
 import { deriveSegments, liveEvents } from '../domain/state';
 import { estimate, hasEnoughData, viewAt } from './model';
 import { DAY_TYPES, taipeiParts, type Slot } from './slots';
@@ -22,7 +22,7 @@ export function bestSlots(index: StatsIndex, settings: Settings, top = 10): Slot
   for (const day of DAY_TYPES) {
     for (let h = 0; h < 24; h++) {
       const slot: Slot = `${day}:${h}`;
-      const v = viewAt(index, slot);
+      const v = viewAt(index, slot, settings.importWeight);
       const c = v.city;
       if (c.idleHours < 1 && c.orders < 3) continue;
       const lam = (c.orders + 2 * rate(v.cityAll.orders, v.cityAll.idleHours, 1)) / (c.idleHours + 2);
@@ -32,7 +32,6 @@ export function bestSlots(index: StatsIndex, settings: Settings, top = 10): Slot
       out.push({ slot, hourly: (V / (W + D)) * 60, waitMin: W, perOrder: V, orders: c.orders, idleHours: c.idleHours });
     }
   }
-  void settings;
   return out.sort((a, b) => b.hourly - a.hourly).slice(0, top);
 }
 
@@ -69,12 +68,16 @@ export function bestCells(index: StatsIndex, settings: Settings, top = 10): Cell
   for (const a of merged.values()) {
     for (const k of Object.keys(all) as (keyof Acc)[]) all[k] += a[k];
   }
+  for (const o of index.official?.values() ?? []) {
+    for (const k of Object.keys(all) as (keyof Acc)[]) all[k] += o[k] * settings.importWeight;
+  }
   // 借用 estimate：把「全時段」當成一個槽位
   const view = { slot: 'weekday:0' as Slot, cells: merged, video: new Map(), city: all, cityAll: all };
   const out: CellRank[] = [];
   for (const cell of merged.keys()) {
     const e = estimate(view, cell, settings);
-    if (!hasEnoughData(e) || e.orders < 1) continue;
+    // 只接過一兩單的格子信心太低，排行榜上容易誤導
+    if (!hasEnoughData(e) || e.orders < 3) continue;
     const [lat, lon] = cellToLatLng(cell);
     out.push({
       cell,
@@ -102,7 +105,20 @@ export interface Period {
 
 const MS_H = 3_600_000;
 
-function periodsBy(events: readonly TripEvent[], fares: ReadonlyMap<string, Fare>, settings: Settings, keyOf: (ts: number) => string, now: number): Period[] {
+/** Uber 官方資料（沒有和自己按鈕記錄重疊的部分），讓統計頁也看得到歷史 */
+export interface OfficialHistory {
+  trips: readonly ImportedTrip[];
+  idle: readonly ImportedIdle[];
+}
+
+function periodsBy(
+  events: readonly TripEvent[],
+  fares: ReadonlyMap<string, Fare>,
+  settings: Settings,
+  keyOf: (ts: number) => string,
+  now: number,
+  official?: OfficialHistory,
+): Period[] {
   const map = new Map<string, Period>();
   const get = (k: string) => {
     let p = map.get(k);
@@ -128,6 +144,36 @@ function periodsBy(events: readonly TripEvent[], fares: ReadonlyMap<string, Fare
     }
   }
   if (onlineAt != null) get(keyOf(onlineAt)).onlineHours += (now - onlineAt) / MS_H;
+
+  if (official) {
+    // 自己有按按鈕的班別以自己的記錄為準，官方資料只補沒有記錄的時間
+    const shifts: [number, number][] = [];
+    let on: number | null = null;
+    for (const e of live) {
+      if (e.type === 'online') on = e.ts;
+      else if (e.type === 'offline' && on != null) {
+        shifts.push([on, e.ts]);
+        on = null;
+      }
+    }
+    if (on != null) shifts.push([on, now]);
+    const covered = (t: number) => shifts.some(([a, b]) => t >= a && t <= b);
+    // 上線時數 ≈ 空車時間 ＋ 每趟從接單到下客
+    for (const t of official.trips) {
+      if (t.source !== 'uber_zip' || t.requestTs == null || covered(t.requestTs)) continue;
+      const p = get(keyOf(t.requestTs));
+      p.trips++;
+      p.earnings += (t.fare ?? 0) + (settings.fareIncludesSurge ? 0 : (t.surge ?? 0));
+      p.fareSum += t.fare ?? 0;
+      p.surge += t.surge ?? 0;
+      if (t.dropoffTs != null && t.dropoffTs > t.requestTs) p.onlineHours += (t.dropoffTs - t.requestTs) / MS_H;
+    }
+    for (const i of official.idle) {
+      if (covered(i.start)) continue;
+      get(keyOf(i.start)).onlineHours += (i.end - i.start) / MS_H;
+    }
+  }
+
   for (const p of map.values()) p.hourly = p.onlineHours >= 0.1 ? p.earnings / p.onlineHours : null;
   return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
 }
@@ -141,12 +187,25 @@ export function weekKey(ts: number): string {
 
 export const monthKey = (ts: number): string => taipeiParts(ts).dateKey.slice(0, 7);
 
-export function weekly(events: readonly TripEvent[], fares: ReadonlyMap<string, Fare>, settings: Settings, now: number, weeks = 8): Period[] {
-  return periodsBy(events, fares, settings, weekKey, now).slice(0, weeks);
+export function weekly(
+  events: readonly TripEvent[],
+  fares: ReadonlyMap<string, Fare>,
+  settings: Settings,
+  now: number,
+  weeks = 8,
+  official?: OfficialHistory,
+): Period[] {
+  return periodsBy(events, fares, settings, weekKey, now, official).slice(0, weeks);
 }
 
-export function monthly(events: readonly TripEvent[], fares: ReadonlyMap<string, Fare>, settings: Settings, now: number): Period[] {
-  return periodsBy(events, fares, settings, monthKey, now);
+export function monthly(
+  events: readonly TripEvent[],
+  fares: ReadonlyMap<string, Fare>,
+  settings: Settings,
+  now: number,
+  official?: OfficialHistory,
+): Period[] {
+  return periodsBy(events, fares, settings, monthKey, now, official);
 }
 
 export interface DeclineStats {

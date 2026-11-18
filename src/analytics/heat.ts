@@ -23,12 +23,15 @@ export interface HexCell {
 function addAcc(t: Acc, s: Acc) {
   for (const k of Object.keys(t) as (keyof Acc)[]) t[k] += s[k];
 }
+function addScaled(t: Acc, s: Acc, w: number) {
+  for (const k of Object.keys(t) as (keyof Acc)[]) t[k] += s[k] * w;
+}
 function addVid(t: VideoAcc, s: VideoAcc) {
   for (const k of Object.keys(t) as (keyof VideoAcc)[]) t[k] += s[k];
 }
 
 /** 把多個槽位的原始累計量直接加總（「整天」或「全部日型」用） */
-export function mergedView(index: StatsIndex, slots: readonly Slot[]): SlotView {
+export function mergedView(index: StatsIndex, slots: readonly Slot[], importWeight = 0.3): SlotView {
   const cells = new Map<string, Acc>();
   const video = new Map<string, VideoAcc>();
   for (const s of slots) {
@@ -47,19 +50,25 @@ export function mergedView(index: StatsIndex, slots: readonly Slot[]): SlotView 
   for (const a of cells.values()) addAcc(city, a);
   const cityAll = emptyAcc();
   for (const m of index.cells.values()) for (const a of m.values()) addAcc(cityAll, a);
+  // 官方資料裡沒有地點的部分只進全城層，乘上 importWeight
+  for (const s of slots) {
+    const o = index.official?.get(s);
+    if (o) addScaled(city, o, importWeight);
+  }
+  for (const o of index.official?.values() ?? []) addScaled(cityAll, o, importWeight);
   return { slot: slots[0] ?? 'weekday:0', cells, video, city, cityAll };
 }
 
-export function viewFor(index: StatsIndex, day: DayChoice, hour: HourChoice): SlotView {
-  if (day !== 'all' && hour !== 'all') return viewAt(index, `${day}:${hour}`);
+export function viewFor(index: StatsIndex, day: DayChoice, hour: HourChoice, importWeight = 0.3): SlotView {
+  if (day !== 'all' && hour !== 'all') return viewAt(index, `${day}:${hour}`, importWeight);
   const days = day === 'all' ? DAY_TYPES : [day];
   const hours = hour === 'all' ? Array.from({ length: 24 }, (_, i) => i) : [hour];
-  return mergedView(index, days.flatMap((d) => hours.map((h) => `${d}:${h}` as Slot)));
+  return mergedView(index, days.flatMap((d) => hours.map((h) => `${d}:${h}` as Slot)), importWeight);
 }
 
 /** 不含開車過去的預期時薪（地圖不是從某個位置出發） */
 export function heatCells(index: StatsIndex, day: DayChoice, hour: HourChoice, settings: Settings): HexCell[] {
-  const view = viewFor(index, day, hour);
+  const view = viewFor(index, day, hour, settings.importWeight);
   const out: HexCell[] = [];
   for (const cell of view.cells.keys()) {
     const e = estimate(view, cell, settings);

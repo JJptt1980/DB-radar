@@ -1,6 +1,8 @@
 // 資料模型（SPEC 第 2.2 節）。改動資料格式時要遞增 SCHEMA_VERSION 並寫 migration。
 
-export const SCHEMA_VERSION = 1;
+// v1 → v2（2026-11-19）：新增 importedIdle（Uber 官方資料的空車時段）；
+// 影片匯入的卡片時間改存在 requestTs（實際對照官方資料後確認是接單時間，不是上客時間）。
+export const SCHEMA_VERSION = 2;
 
 export type EventType =
   | 'online'
@@ -57,9 +59,12 @@ export interface ImportedTrip {
   source: 'uber_zip' | 'video';
   externalId: string | null;
   dedupeKey: string;
+  /** 接單時間。影片卡片上的時間就是這個（精度到分） */
   requestTs: number | null;
+  /** 上客、下客時間：官方資料才有；影片行程和官方資料對上之後補上 */
   pickupTs: number | null;
   dropoffTs: number | null;
+  /** 行程時長（上客到下客） */
   durationSec: number | null;
   distanceKm: number | null;
   pickupLat: number | null;
@@ -76,6 +81,19 @@ export interface ImportedTrip {
   lowSupport?: boolean;
   matchedDropoffEventId?: string | null;
   raw: Record<string, string>;
+  updatedAt: number;
+}
+
+/** Uber 官方資料「上線狀態」裡的一段空車時間（earner_state = open） */
+export interface ImportedIdle {
+  id: string;
+  source: 'uber_zip';
+  start: number;
+  end: number;
+  /** true = 接到單結束（下一個狀態是 enroute）；false = 下線結束（截尾） */
+  endedWithOrder: boolean;
+  /** 這段時間的 GPS 軌跡 [ts, lat, lon]，只有 App 分析資料涵蓋的最近 30 天才有 */
+  path: [number, number, number][] | null;
   updatedAt: number;
 }
 
@@ -145,5 +163,6 @@ export interface BackupFile {
   fares: Fare[];
   trackPoints: TrackPoint[];
   importedTrips: ImportedTrip[];
+  importedIdle: ImportedIdle[];
   settings: Settings;
 }

@@ -7,6 +7,7 @@ import { BackupFormatError } from '../domain/merge';
 import { fmtTime } from '../domain/time';
 import {
   PRECISION_LABEL,
+  cardTs,
   parseVideoImport,
   planVideoImport,
   type FareSuggestion,
@@ -167,7 +168,7 @@ function Preview(props: {
     .map(([k, v]) => `${PRECISION_LABEL[k]} ${v}`)
     .join('、');
   const newIds = new Set(plan.toAdd.map((t) => t.id));
-  const trips = [...file.trips].sort((a, b) => (a.pickupTs ?? 0) - (b.pickupTs ?? 0));
+  const trips = [...file.trips].sort((a, b) => (cardTs(a) ?? 0) - (cardTs(b) ?? 0));
   return (
     <Dialog title="匯入預覽" onClose={props.onCancel}>
       <dl class="facts">
@@ -204,7 +205,7 @@ function Preview(props: {
         {trips.map((t) => (
           <li key={t.id} class={t.lowSupport ? 'low' : newIds.has(t.id) ? '' : 'dup'}>
             <div class="trip-head">
-              <span>{t.raw.startLocal ?? (t.pickupTs ? fmtTime(t.pickupTs) : '')}</span>
+              <span>{t.raw.startLocal ?? (cardTs(t) ? fmtTime(cardTs(t)!) : '')}</span>
               <span>{t.product}</span>
               <b>{money(t.fare ?? 0)}</b>
             </div>

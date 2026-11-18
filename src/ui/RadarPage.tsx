@@ -1,6 +1,6 @@
 // 雷達頁（SPEC 5.2）：圓形螢幕、方格底、黃色光點是熱點、中間紅色三角形是自己。全部自己用 Canvas 畫。
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { recommend, type Candidate, type Recommendation, MIN_TRIPS } from '../analytics/model';
+import { hasEnoughData, recommend, type Candidate, type Recommendation, MIN_TRIPS } from '../analytics/model';
 import { slotLabel, slotOf } from '../analytics/slots';
 import { compassLabel, distanceM, type LatLon } from '../domain/geo';
 import { lastFix, onFix } from '../sensors/gps';
@@ -157,6 +157,14 @@ function TopCard(props: { rec: Recommendation | null; enough: boolean; heading: 
         <div class="radar-sub">
           已記錄 {rec.tripCount} 趟，累積到 {MIN_TRIPS} 趟後開始推薦
         </div>
+      </section>
+    );
+  }
+  if (rec.best.here && !hasEnoughData(rec.here)) {
+    return (
+      <section class="radar-card">
+        <div class="radar-main">這附近還沒有資料</div>
+        <div class="radar-sub muted">雷達範圍內沒有足夠的記錄，開到常跑的區域再看看</div>
       </section>
     );
   }

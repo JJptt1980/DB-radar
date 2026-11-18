@@ -95,8 +95,8 @@ describe('buildStats', () => {
 
   it('影片空檔：同一天、空檔 ≤ gapBreakMin、精度夠的才算；已配對的不算', () => {
     const vid = (id: string, pickMin: number, durMin: number, extra: Partial<ImportedTrip> = {}): ImportedTrip => ({
-      id, source: 'video', externalId: null, dedupeKey: id, requestTs: null,
-      pickupTs: t0 + pickMin * MIN, dropoffTs: t0 + (pickMin + durMin) * MIN, durationSec: durMin * 60, distanceKm: 3,
+      id, source: 'video', externalId: null, dedupeKey: id,
+      requestTs: t0 + pickMin * MIN, pickupTs: null, dropoffTs: null, durationSec: durMin * 60, distanceKm: 3,
       pickupLat: A.lat, pickupLon: A.lon, dropoffLat: B.lat, dropoffLon: B.lon,
       pickupAddress: '', dropoffAddress: '', pickupPrecision: 'lane', dropoffPrecision: 'lane',
       fare: 200, surge: 0, product: null, matchedDropoffEventId: null, raw: {}, updatedAt: 0, ...extra,
@@ -116,6 +116,7 @@ describe('平滑與推薦', () => {
       res: 8,
       cells: new Map([['fri:22' as const, new Map([[cell, { idleHours: idle, orders, declined: 0, sumNetFare: orders * 200, fareOrders: orders, sumOrderMinutes: orders * 20, durOrders: orders }]])]]),
       video: new Map(),
+      official: new Map(),
       tripCount: 100,
       firstTs: 0,
     });
@@ -231,5 +232,73 @@ describe('地圖熱力圖', () => {
     expect(scaleRange([])).toEqual([0, 1]);
     const [a, b] = scaleRange([5, 5, 5]);
     expect(b).toBeGreaterThan(a);
+  });
+});
+
+
+import type { ImportedIdle } from '../src/db/types';
+
+describe('Uber 官方資料進分析', () => {
+  const A = { lat: 25.05, lon: 121.52 };
+  const cellA = latLngToCell(A.lat, A.lon, 8);
+  const t0 = FRI_22; // 週五 22:00
+  const idle = (id: string, startMin: number, endMin: number, withPath: boolean, endedWithOrder = true): ImportedIdle => ({
+    id, source: 'uber_zip', start: t0 + startMin * MIN, end: t0 + endMin * MIN, endedWithOrder,
+    path: withPath ? [[t0 + (startMin + 1) * MIN, A.lat, A.lon]] : null, updatedAt: 0,
+  });
+  const trip = (startMin: number, fare: number): ImportedTrip => ({
+    id: `t${startMin}`, source: 'uber_zip', externalId: null, dedupeKey: `t${startMin}`,
+    requestTs: t0 + startMin * MIN, pickupTs: t0 + (startMin + 5) * MIN, dropoffTs: t0 + (startMin + 25) * MIN,
+    durationSec: 1200, distanceKm: 5, pickupLat: null, pickupLon: null, dropoffLat: null, dropoffLon: null,
+    pickupAddress: null, dropoffAddress: null, pickupPrecision: null, dropoffPrecision: null,
+    fare, surge: 0, product: null, matchedDropoffEventId: null, raw: {}, updatedAt: 0,
+  });
+
+  it('有定位的空車時段算進格子（權重 1），接到的單帶上實收與耗時', () => {
+    const st = buildStats({ events: [], fares: new Map(), tracks: [], imported: [trip(30, 300)], idle: [idle('a', 0, 30, true)], settings: S });
+    const a = st.cells.get('fri:22')!.get(cellA)!;
+    expect(a.idleHours).toBeCloseTo(0.5);
+    expect([a.orders, a.sumNetFare, a.sumOrderMinutes]).toEqual([1, 300, 25]);
+    expect(st.tripCount).toBe(1);
+  });
+
+  it('沒有定位的只進全城層，分析時乘上 importWeight', () => {
+    const st = buildStats({ events: [], fares: new Map(), tracks: [], imported: [trip(30, 300)], idle: [idle('a', 0, 30, false)], settings: S });
+    expect(st.cells.size).toBe(0);
+    const o = st.official.get('fri:22')!;
+    expect([o.idleHours, o.orders, o.sumNetFare, o.fareOrders]).toEqual([0.5, 1, 300, 1]);
+    expect(st.tripCount).toBe(0);
+    const v = viewAt(st, 'fri:22', 0.5);
+    expect(v.city.idleHours).toBeCloseTo(0.5 * 0.6 * 0.5);
+  });
+
+  it('和自己按鈕記錄重疊的官方資料不重複計算', () => {
+    const own = [ev('on', 'online', t0 - 10 * MIN, A), ev('off', 'offline', t0 + 60 * MIN, A)];
+    const st = buildStats({ events: own, fares: new Map(), tracks: [], imported: [trip(30, 300)], idle: [idle('a', 0, 30, true)], settings: S });
+    expect(st.official.size).toBe(0);
+    expect(st.cells.get('fri:22')?.get(cellA)?.orders ?? 0).toBe(0);
+  });
+});
+
+describe('統計頁納入官方歷史', () => {
+  it('每週：官方行程的實收與趟數；上線時數 = 空車 + 接單到下客；和自己記錄重疊的不算', () => {
+    const t0 = Date.UTC(2026, 2, 2, 1, 0); // 台北週一 09:00
+    const trip = (min: number, fare: number): ImportedTrip => ({
+      id: `o${min}`, source: 'uber_zip', externalId: null, dedupeKey: `o${min}`,
+      requestTs: t0 + min * MIN, pickupTs: t0 + (min + 5) * MIN, dropoffTs: t0 + (min + 30) * MIN,
+      durationSec: 1500, distanceKm: 5, pickupLat: null, pickupLon: null, dropoffLat: null, dropoffLon: null,
+      pickupAddress: null, dropoffAddress: null, pickupPrecision: null, dropoffPrecision: null,
+      fare, surge: 0, product: null, matchedDropoffEventId: null, raw: {}, updatedAt: 0,
+    });
+    const idle: ImportedIdle = { id: 'i', source: 'uber_zip', start: t0 - 30 * MIN, end: t0, endedWithOrder: true, path: null, updatedAt: 0 };
+    const [w] = weekly([], new Map(), S, t0 + 10 * H, 8, { trips: [trip(0, 300)], idle: [idle] });
+    expect(w!.key).toBe('2026-03-02');
+    expect([w!.trips, w!.earnings]).toEqual([1, 300]);
+    expect(w!.onlineHours).toBeCloseTo(1); // 30 分空車 + 30 分接單到下客
+    expect(w!.hourly).toBeCloseTo(300);
+    const own = [ev('on', 'online', t0 - 60 * MIN, null), ev('off', 'offline', t0 + 60 * MIN, null)];
+    const [w2] = weekly(own, new Map(), S, t0 + 10 * H, 8, { trips: [trip(0, 300)], idle: [idle] });
+    expect([w2!.trips, w2!.earnings]).toEqual([0, 0]);
+    expect(w2!.onlineHours).toBeCloseTo(2);
   });
 });

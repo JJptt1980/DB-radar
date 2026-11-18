@@ -2,12 +2,16 @@
 import { SCHEMA_VERSION, type Fare, type GeoPrecision, type ImportedTrip, type TripEvent } from '../db/types';
 import { BackupFormatError } from '../domain/merge';
 import { fmtDateKey } from '../domain/time';
+import { migrateTripV1 } from '../domain/migrate';
 
 export interface VideoImportFile {
   sourceVideo: string;
   exportedAt: number;
   trips: ImportedTrip[];
 }
+
+/** 影片卡片的時間（接單時間）；舊格式的檔案存在 pickupTs */
+export const cardTs = (t: ImportedTrip): number | null => t.requestTs ?? t.pickupTs;
 
 export function parseVideoImport(data: unknown): VideoImportFile {
   if (!data || typeof data !== 'object') throw new BackupFormatError('檔案內容不是 JSON 物件');
@@ -18,7 +22,9 @@ export function parseVideoImport(data: unknown): VideoImportFile {
     throw new BackupFormatError('檔案版本比 App 新，請先更新 App');
   }
   if (!Array.isArray(d.importedTrips)) throw new BackupFormatError('檔案裡沒有行程');
-  const trips = d.importedTrips as ImportedTrip[];
+  const trips = (d.importedTrips as ImportedTrip[]).map((t) =>
+    d.schemaVersion === 1 ? migrateTripV1(t) : t,
+  );
   for (const t of trips) {
     if (!t || typeof t.id !== 'string' || typeof t.dedupeKey !== 'string' || t.source !== 'video') {
       throw new BackupFormatError('檔案裡有格式不對的行程');
@@ -31,7 +37,7 @@ export function parseVideoImport(data: unknown): VideoImportFile {
   };
 }
 
-/** 影片卡片的時間和按鈕的「上客」相差多少以內算同一趟 */
+/** 影片卡片的時間（接單）和按鈕的「接單」相差多少以內算同一趟 */
 export const MATCH_WINDOW_MS = 3 * 60_000;
 
 export interface FareSuggestion {
@@ -66,14 +72,16 @@ export function planVideoImport(
 ): VideoImportPlan {
   const keys = new Set(existing.map((t) => t.dedupeKey));
   const live = events.filter((e) => !e.deleted).sort((a, b) => a.ts - b.ts);
-  const pickups = live.filter((e) => e.type === 'pickup');
+  const accepts = live.filter((e) => e.type === 'accept');
   const usedDropoff = new Set(
     existing.map((t) => t.matchedDropoffEventId).filter((x): x is string => !!x),
   );
 
-  /** 上客之後的第一個下客（同一班） */
-  const dropoffAfter = (p: TripEvent): TripEvent | undefined =>
-    live.find((e) => e.ts > p.ts && e.shiftId === p.shiftId && e.type === 'dropoff');
+  /** 接單之後的第一個下客（同一班，中間沒有取消） */
+  const dropoffAfter = (a: TripEvent): TripEvent | undefined => {
+    const next = live.find((e) => e.ts > a.ts && e.shiftId === a.shiftId && (e.type === 'dropoff' || e.type === 'cancel'));
+    return next?.type === 'dropoff' ? next : undefined;
+  };
 
   const plan: VideoImportPlan = {
     dates: [],
@@ -96,7 +104,8 @@ export function planVideoImport(
     for (const p of [t.pickupPrecision, t.dropoffPrecision]) {
       if (p) plan.precision[p] = (plan.precision[p] ?? 0) + 1;
     }
-    if (t.pickupTs != null) dates.add(fmtDateKey(t.pickupTs));
+    const ts = cardTs(t);
+    if (ts != null) dates.add(fmtDateKey(ts));
 
     if (keys.has(t.dedupeKey)) {
       plan.skipped++;
@@ -105,12 +114,12 @@ export function planVideoImport(
     keys.add(t.dedupeKey);
 
     let matchedDropoffEventId: string | null = null;
-    if (t.pickupTs != null) {
+    if (ts != null) {
       let best: TripEvent | null = null;
-      for (const p of pickups) {
-        const diff = Math.abs(p.ts - t.pickupTs);
-        if (diff > MATCH_WINDOW_MS || fmtDateKey(p.ts) !== fmtDateKey(t.pickupTs)) continue;
-        if (!best || diff < Math.abs(best.ts - t.pickupTs)) best = p;
+      for (const p of accepts) {
+        const diff = Math.abs(p.ts - ts);
+        if (diff > MATCH_WINDOW_MS || fmtDateKey(p.ts) !== fmtDateKey(ts)) continue;
+        if (!best || diff < Math.abs(best.ts - ts)) best = p;
       }
       const drop = best ? dropoffAfter(best) : undefined;
       if (drop && !usedDropoff.has(drop.id)) {

@@ -119,7 +119,8 @@ class ParseTest(unittest.TestCase):
         self.assertTrue(second['lowSupport'])
         self.assertEqual(first['raw']['gapBeforeMin'], '')
         self.assertEqual(second['raw']['gapBeforeMin'], '12.5')  # 09:30 − (09:05 + 12:30)
-        self.assertEqual(first['dropoffTs'] - first['pickupTs'], 750_000)
+        self.assertIsNone(first['pickupTs'])  # 卡片時間是接單時間，上下客時間要等官方資料
+        self.assertEqual(second['requestTs'] - first['requestTs'], 25 * 60_000)
         self.assertTrue(any('1 張畫面' in w for w in parse.validate(trips)))
 
 
