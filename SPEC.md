@@ -493,17 +493,20 @@ mp4 → [1] ffmpeg 抽畫面 → [2] Apple Vision OCR → [3] 卡片解析
 
 - 以 4 fps 抽畫面（12 秒約 48 張）。11/18 樣本實測，3 fps 時每張卡片都至少完整出現在 2 張畫面中；4 fps 保留餘裕給滑得比較快的情況。
 - 用 `mpdecimate` 去掉靜止時的重複畫面。
-- 裁掉頂部狀態列和底部導覽列，但保留日期標題列。以 1080×2400 為準：保留 y = 100～2280。其他解析度依比例換算。
+- 裁掉頂部狀態列、底部導覽列和 Uber 自己的底部分頁列（它會蓋住清單最後一行，讓 OCR 讀出亂碼），但保留日期標題列。以 1080×2400 為準：保留 y = 100～2180。其他解析度依比例換算。
 - 輸出 PNG（無損，對 OCR 比較好）。
 - 開頭的桌面畫面：OCR 後如果找不到「行程費用紀錄」或日期標題（`\d+ 月 \d+ 日週.`），就丟掉這張畫面。
 
 測試指令（可整段貼進 zsh）：
 
 ```
-brew install ffmpeg && mkdir -p ~/DB-radar-import/frames && ffmpeg -i ~/Downloads/Screenrecording_20261118_215232.mp4 -vf "fps=4,mpdecimate,crop=1080:2180:0:100" -fps_mode vfr ~/DB-radar-import/frames/f_%04d.png && ls ~/DB-radar-import/frames | wc -l
+brew install ffmpeg && mkdir -p ~/DB-radar-import/frames && ffmpeg -i ~/Downloads/Screenrecording_20261118_215232.mp4 -vf "fps=4,mpdecimate,crop=1080:2080:0:100" -fps_mode vfr ~/DB-radar-import/frames/f_%04d.png && ls ~/DB-radar-import/frames | wc -l
 ```
 
 #### 步驟 2：Apple Vision OCR（繁中）
+
+- 實作補充：畫面先放大 2 倍再辨識，行尾的英文字母（例如 International 的 l）才不會漏掉。
+- Uber 的地址太長時會被畫面右緣切掉（例：「Taoyuan Ci」「台灣 33(」），解析時用字表補完英文字，郵遞區號依區名補回。
 
 `ocr.swift` 是命令列小程式，設定如下：
 

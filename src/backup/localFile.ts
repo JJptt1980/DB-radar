@@ -8,7 +8,7 @@ async function gzip(text: string): Promise<Blob> {
   return new Response(stream).blob();
 }
 
-async function readMaybeGzip(file: Blob): Promise<string> {
+export async function readMaybeGzip(file: Blob): Promise<string> {
   const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
   if (head[0] === 0x1f && head[1] === 0x8b) {
     const stream = file.stream().pipeThrough(new DecompressionStream('gzip'));

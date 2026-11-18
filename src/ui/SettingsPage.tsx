@@ -3,6 +3,7 @@ import { clearAll, countTrackPoints } from '../db/db';
 import { exportToFile, importFromFile } from '../backup/localFile';
 import { BackupFormatError } from '../domain/merge';
 import { Dialog } from './Dialog';
+import { VideoImportCard } from './VideoImport';
 import { isStandalone, notificationPermission } from '../sensors/storage';
 import { getState, loadAll, retryPersist, useAppState } from './store';
 
@@ -129,6 +130,8 @@ export function SettingsPage() {
           }}
         />
       </section>
+
+      <VideoImportCard />
 
       <section class="card">
         <h2>開發模式</h2>

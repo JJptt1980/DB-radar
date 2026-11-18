@@ -7,3 +7,4 @@ dev-dist
 
 # 真實行程資料，只留在本機，不公開
 tests/fixtures/*.json
+__pycache__

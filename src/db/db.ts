@@ -144,3 +144,12 @@ export async function clearAll(): Promise<void> {
     tx.done,
   ]);
 }
+
+export async function getAllImportedTrips(): Promise<ImportedTrip[]> {
+  return (await db()).getAll('importedTrips');
+}
+
+export async function putImportedTrips(trips: readonly ImportedTrip[]): Promise<void> {
+  const tx = (await db()).transaction('importedTrips', 'readwrite');
+  await Promise.all([...trips.map((t) => tx.store.put(t)), tx.done]);
+}
