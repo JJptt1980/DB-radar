@@ -199,6 +199,26 @@
   footer { border-top: 1px solid var(--line); padding: 28px 0 48px; font-size: 13px; color: var(--muted); }
   footer p { margin: 6px 0; }
 
+  /* 大數據 */
+  .bd-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--card); border-radius: 999px; padding: 4px; margin-bottom: 16px; }
+  .bd-seg button { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 800; padding: 8px 6px; border-radius: 999px; cursor: pointer; }
+  .bd-seg button.on { background: var(--amber); color: #1a1205; }
+  .bd { width: 100%; max-width: 360px; }
+  .bd-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+  .bd-grid i { aspect-ratio: 1; border-radius: 4px; background: var(--card); transition: background 0.5s, box-shadow 0.5s; }
+  .bd-grid i.l1 { background: rgba(255, 181, 71, 0.28); }
+  .bd-grid i.l2 { background: rgba(255, 181, 71, 0.6); }
+  .bd-grid i.l3 { background: var(--amber); box-shadow: 0 0 10px rgba(255, 181, 71, 0.55); }
+  .bd-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .bd-stats div { background: var(--card-2); border-radius: 14px; padding: 10px 14px; display: flex; flex-direction: column; }
+  .bd-stats b { font-size: 22px; }
+  .bd-stats span { font-size: 12px; color: var(--muted); }
+  .bd-note { margin-top: 12px; font-size: 14px; color: var(--muted); min-height: 3em; }
+  .bd-note b { color: var(--amber); }
+  .congrats { margin-top: 22px; padding: 18px 20px; border-radius: 18px; background: linear-gradient(135deg, rgba(255, 181, 71, 0.16), rgba(255, 154, 31, 0.06)); border: 1px solid rgba(255, 181, 71, 0.35); }
+  .congrats h3 { color: var(--amber); }
+  .congrats p { margin: 6px 0 0; color: var(--text); }
+
   @media (min-width: 860px) {
     section { padding: 96px 0; }
     .hero { padding: 72px 0 80px; }
@@ -300,6 +320,38 @@
         <div class="card step">
           <h3>雷達指方向</h3>
           <p>空車時打開雷達，光點越亮越值得去；或者告訴你「原地等候最划算」。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 你就是自己的大數據 -->
+  <section>
+    <div class="wrap">
+      <div class="feature" style="border-top: 0; padding-top: 0">
+        <div>
+          <div class="eyebrow">你就是自己的大數據</div>
+          <h2>別人的經驗是別人的，<br />你跑過的每一單才最準。</h2>
+          <p class="lead">群組裡的「那邊很多單」不一定適合你的車、你的時段、你住的地方。雷達只用你自己的紀錄：你在哪裡等、等多久、接到什麼單。跑得越多，它越懂你。</p>
+          <div class="congrats">
+            <h3>老司機？那恭喜你了。</h3>
+            <p>匯入 Uber 官方資料，好幾年的行程一次進來。不用從頭記錄，第一天打開，雷達就已經是你的大數據。</p>
+          </div>
+        </div>
+        <div class="demo">
+          <div class="bd">
+            <div class="bd-seg" role="tablist" aria-label="資料量">
+              <button type="button" data-bd="0" class="on">剛開始</button>
+              <button type="button" data-bd="1">跑一年</button>
+              <button type="button" data-bd="2">老司機</button>
+            </div>
+            <div class="bd-grid" id="bdGrid" aria-hidden="true"></div>
+            <div class="bd-stats">
+              <div><b id="bdTrips">40</b><span>趟行程</span></div>
+              <div><b id="bdHours">12%</b><span>一週時段有資料</span></div>
+            </div>
+            <div class="bd-note" id="bdNote">剛開始：雷達還在認識你，先從附近的熱點和相鄰時段借資料。</div>
+          </div>
         </div>
       </div>
     </div>
@@ -492,6 +544,43 @@
 <script>
 (() => {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- 你就是自己的大數據 ----------
+  const bdGrid = document.getElementById('bdGrid');
+  const bdCells = [];
+  for (let i = 0; i < 72; i++) bdGrid.appendChild((bdCells[i] = document.createElement('i')));
+  // 固定的偽隨機，讓每格有自己的「熱度」
+  const bdHeat = bdCells.map((_, i) => {
+    const x = Math.sin(i * 12.9898 + 4.1) * 43758.5453;
+    const r = x - Math.floor(x);
+    const col = i % 12, row = Math.floor(i / 12);
+    const peak = Math.exp(-((col - 8) ** 2) / 10) + Math.exp(-((row - 2) ** 2) / 4) * 0.4;
+    return Math.min(1, r * 0.6 + peak * 0.5);
+  });
+  const bdModes = [
+    { cover: 0.12, trips: '40', hours: '12%', note: '剛開始：雷達還在認識你，先從附近的熱點和相鄰時段借資料。' },
+    { cover: 0.55, trips: '1,800', hours: '68%', note: '跑一年：大部分時段都有你自己的紀錄，方向開始有把握。' },
+    { cover: 1, trips: '6,500', hours: '97%', note: '<b>老司機，恭喜你了！</b>幾年的資料一次匯入，幾乎每個時段、每一區都有你的足跡。' },
+  ];
+  let bi = 0, bdAuto = true;
+  function setBd() {
+    const m = bdModes[bi];
+    bdCells.forEach((c, i) => {
+      const h = bdHeat[i];
+      const lit = h > 1 - m.cover;
+      const v = lit ? h * (0.5 + m.cover * 0.5) : 0;
+      c.className = v > 0.7 ? 'l3' : v > 0.45 ? 'l2' : v > 0 ? 'l1' : '';
+    });
+    document.getElementById('bdTrips').textContent = m.trips;
+    document.getElementById('bdHours').textContent = m.hours;
+    document.getElementById('bdNote').innerHTML = m.note;
+    document.querySelectorAll('[data-bd]').forEach((b) => b.classList.toggle('on', +b.dataset.bd === bi));
+  }
+  document.querySelectorAll('[data-bd]').forEach((b) =>
+    b.addEventListener('click', () => { bdAuto = false; bi = +b.dataset.bd; setBd(); })
+  );
+  setBd();
+  if (!reduce) setInterval(() => { if (bdAuto) { bi = (bi + 1) % bdModes.length; setBd(); } }, 2800);
 
   // ---------- 雷達（示範資料） ----------
   const canvas = document.getElementById('radar');
