@@ -220,13 +220,12 @@ export function SettingsPage() {
           />
           <span>雷達頁顯示記錄按鈕（接單、上客、下客，不用切回記錄頁）</span>
         </label>
-        <p class="muted small">縮放按鈕放在哪個角落</p>
+        <p class="muted small">縮放按鈕的位置</p>
         <div class="chips">
           {(
             [
-              ['tl', '左上'],
-              ['tr', '右上'],
               ['bl', '左下'],
+              ['bc', '正下方'],
               ['br', '右下'],
             ] as const
           ).map(([k, label]) => (

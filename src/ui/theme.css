@@ -387,31 +387,95 @@ body {
 .radar-sub { font-size: 20px; color: var(--accent); margin-top: 6px; }
 .arrow { display: inline-block; font-size: 40px; color: var(--accent); transition: transform 0.4s ease; }
 .radar-wrap { display: flex; justify-content: center; }
-.radar-box { position: relative; }
-.radar-wrap canvas { display: block; touch-action: none; }
-/* 角落的白色圓鈕：按下去縮一下 */
+.radar-box { position: relative; --s: 340px; }
+.radar-box.zoom-bc { padding-bottom: 34px; }
+.radar-wrap canvas { position: relative; z-index: 1; display: block; touch-action: none; }
+
+/*
+ * 縮放按鈕藏在雷達外框後面，只冒出一部分：
+ * - 左下、右下：從側面看的圓柱（白色頂面＋灰色側面），沿著對角線往外伸
+ * - 正下方：從正上方俯瞰的圓鈕，被雷達下緣擋住一半，看到的是半圓
+ */
 .radar-zoom {
   position: absolute;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  border: 3px solid #c9ced1;
-  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #f1f3f4 45%, #c7ccd0 100%);
-  box-shadow: 0 3px 0 #8d9499, 0 6px 14px rgba(0, 0, 0, 0.5);
+  z-index: 0;
+  padding: 0;
+  border: 0;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease-out, filter 0.08s;
 }
-.radar-zoom.pressed { animation: radar-zoom-press 0.18s ease-out; }
-.radar-zoom:active { transform: translateY(3px); box-shadow: 0 0 0 #8d9499, 0 3px 8px rgba(0, 0, 0, 0.5); }
-@keyframes radar-zoom-press {
-  0% { transform: translateY(3px); box-shadow: 0 0 0 #8d9499, 0 3px 8px rgba(0, 0, 0, 0.5); }
-  100% { transform: none; }
+.radar-zoom.corner-bl,
+.radar-zoom.corner-br {
+  width: 66px;
+  height: 62px;
+  border-radius: 33px / 14px;
+  background: linear-gradient(90deg, #8f969b 0%, #d9dde0 30%, #f4f6f7 48%, #c3c8cc 72%, #7d8489 100%);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+  /* 圓柱中心在對角線上、雷達半徑外一點點 */
+  top: calc(var(--s) * 0.8536 + 9px - 31px);
 }
-.corner-tl { top: -6px; left: -6px; }
-.corner-tr { top: -6px; right: -6px; }
-.corner-bl { bottom: -6px; left: -6px; }
-.corner-br { bottom: -6px; right: -6px; }
-.radar-record { min-height: 72px; font-size: 32px; font-weight: 800; letter-spacing: 0.1em; border-radius: 999px; }
+.radar-zoom.corner-bl { left: calc(var(--s) * 0.1464 - 9px - 33px); transform: rotate(225deg); }
+.radar-zoom.corner-br { left: calc(var(--s) * 0.8536 + 9px - 33px); transform: rotate(135deg); }
+.radar-zoom.corner-bl .cap,
+.radar-zoom.corner-br .cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 40% 35%, #ffffff 0%, #f3f5f6 55%, #cfd4d7 100%);
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.18);
+}
+.radar-zoom.corner-bl:active { transform: rotate(225deg) translateY(7px); filter: brightness(0.93); }
+.radar-zoom.corner-br:active { transform: rotate(135deg) translateY(7px); filter: brightness(0.93); }
+.radar-zoom.corner-bl.pressed { animation: zoom-push-bl 0.2s ease-out; }
+.radar-zoom.corner-br.pressed { animation: zoom-push-br 0.2s ease-out; }
+@keyframes zoom-push-bl { 0% { transform: rotate(225deg) translateY(7px); } 100% { transform: rotate(225deg); } }
+@keyframes zoom-push-br { 0% { transform: rotate(135deg) translateY(7px); } 100% { transform: rotate(135deg); } }
+
+.radar-zoom.corner-bc {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  left: calc(var(--s) / 2 - 42px);
+  top: calc(var(--s) - 6px - 42px);
+  background: radial-gradient(circle, #aab0b4 0%, #8a9196 62%, #5f666b 100%);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+.radar-zoom.corner-bc .cap {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 70%, #ffffff 0%, #f2f4f5 45%, #d2d6d9 85%, #b9bec2 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  transition: transform 0.08s ease-out;
+}
+.radar-zoom.corner-bc:active .cap { transform: scale(0.92); filter: brightness(0.93); }
+.radar-zoom.corner-bc.pressed .cap { animation: zoom-push-bc 0.2s ease-out; }
+@keyframes zoom-push-bc { 0% { transform: scale(0.92); } 100% { transform: none; } }
+
+/* 記錄按鈕：小小的，放在雷達左上角，不搶畫面 */
+.radar-record {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  min-width: 60px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  background: var(--surface);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rec-online, .rec-accept { color: var(--accent); }
+.rec-pickup { color: var(--warn); }
+.rec-dropoff { color: var(--info); }
 .radar-foot { text-align: center; color: var(--muted); font-size: 15px; margin: 0; }
 .progress { height: 10px; border-radius: 999px; background: var(--line); margin-top: 10px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); }

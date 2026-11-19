@@ -131,8 +131,8 @@ export interface Settings {
   radarSweep: boolean;
   /** 下客後跳出車資表單；關掉時車資等匯入 Uber 官方資料再自動補上 */
   askFare: boolean;
-  /** 雷達縮放按鈕放在哪個角落 */
-  radarCorner: 'tl' | 'tr' | 'bl' | 'br';
+  /** 雷達縮放按鈕的位置：左下、正下方、右下 */
+  radarCorner: 'bl' | 'bc' | 'br';
   /** 雷達縮放按鈕的音效 */
   radarSound: boolean;
   /** 介面（雷達螢幕與地圖以外）的深淺色 */

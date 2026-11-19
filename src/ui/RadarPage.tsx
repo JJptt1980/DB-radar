@@ -1,4 +1,5 @@
 // 雷達頁（SPEC 5.2）：圓形螢幕、方格底、黃色光點是熱點、中間紅色三角形是自己。全部自己用 Canvas 畫。
+import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { hasEnoughData, recommend, type Candidate, type Recommendation, MIN_TRIPS } from '../analytics/model';
 import { slotLabel, slotOf } from '../analytics/slots';
@@ -123,30 +124,30 @@ export function RadarPage() {
         corner={app.settings.radarCorner}
         sound={app.settings.radarSound}
         onPick={(c, count) => setPicked({ c, count })}
-      />
+      >
+        {app.settings.radarRecordButton && recordAction && (
+          <button
+            type="button"
+            class={`radar-record rec-${recordAction}`}
+            onClick={() => {
+              try {
+                navigator.vibrate?.(40);
+              } catch {
+                // 不支援震動就算了
+              }
+              void press(recordAction);
+            }}
+          >
+            {RECORD_TEXT[recordAction]}
+          </button>
+        )}
+      </RadarCanvas>
       <p class="radar-foot">
         {slotLabel(slot)}・資料 {tripCount} 趟
         {rec && enough && `・信心度${CONF_LABEL[rec.best.confidence]}`}
         {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'held' ? '・車頭朝上（停車鎖定）' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
         {!calc.real && '・還沒有定位，先用預設中心'}
       </p>
-
-      {app.settings.radarRecordButton && recordAction && (
-        <button
-          type="button"
-          class={`btn radar-record act-${recordAction}`}
-          onClick={() => {
-            try {
-              navigator.vibrate?.(40);
-            } catch {
-              // 不支援震動就算了
-            }
-            void press(recordAction);
-          }}
-        >
-          {RECORD_TEXT[recordAction]}
-        </button>
-      )}
 
       {picked && (() => { const pc = picked.c; return (
         <Dialog title={`${compassLabel(pc.bearing)} ${pc.straightKm.toFixed(1)} km${picked.count > 1 ? `（這一區 ${picked.count} 格）` : ''}`} onClose={() => setPicked(null)}>
@@ -273,9 +274,10 @@ function RadarCanvas(props: {
   heading: number | null;
   maxKm: number;
   sweep: boolean;
-  corner: 'tl' | 'tr' | 'bl' | 'br';
+  corner: 'bl' | 'bc' | 'br';
   sound: boolean;
   onPick: (c: Candidate, count: number) => void;
+  children?: ComponentChildren;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const latest = useRef(props);
@@ -310,6 +312,8 @@ function RadarCanvas(props: {
       const dpr = window.devicePixelRatio || 1;
       size = Math.min(canvas.parentElement!.parentElement!.clientWidth, 520);
       canvas.style.width = canvas.style.height = `${size}px`;
+      // 按鈕位置用這個尺寸算（CSS 變數）
+      canvas.parentElement!.style.setProperty('--s', `${size}px`);
       canvas.width = canvas.height = Math.round(size * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
@@ -525,7 +529,7 @@ function RadarCanvas(props: {
 
   return (
     <div class="radar-wrap">
-      <div class="radar-box">
+      <div class={`radar-box zoom-${props.corner}`}>
         <canvas
           ref={ref}
           onClick={onClick}
@@ -541,7 +545,10 @@ function RadarCanvas(props: {
           class={`radar-zoom corner-${props.corner}${pressed ? ' pressed' : ''}`}
           onClick={onZoomButton}
           aria-label="切換雷達範圍"
-        />
+        >
+          <span class="cap" />
+        </button>
+        {props.children}
       </div>
     </div>
   );

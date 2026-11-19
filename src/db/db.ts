@@ -102,6 +102,8 @@ export async function getSettings(): Promise<Settings> {
   const out = { ...DEFAULT_SETTINGS, ...s };
   // 舊預設 6 km 太小，打開雷達常常什麼都看不到；設定頁沒有改這個值的地方，所以直接換成新預設
   if (out.maxRadarKm === 6) out.maxRadarKm = DEFAULT_SETTINGS.maxRadarKm;
+  // 縮放按鈕不再放上方角落
+  if (!['bl', 'bc', 'br'].includes(out.radarCorner)) out.radarCorner = DEFAULT_SETTINGS.radarCorner;
   return out;
 }
 
