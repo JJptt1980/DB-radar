@@ -123,7 +123,7 @@ export function RadarPage() {
         heading={heading.deg}
         loading={loading || !index}
         state={app.status.state}
-        memeSec={app.settings.memeIntervalSec}
+        memeSec={app.settings.memeEnabled ? app.settings.memeIntervalSec : 0}
       />
       <RadarCanvas
         dots={enough ? dots : []}

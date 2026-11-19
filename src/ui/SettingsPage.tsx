@@ -224,8 +224,12 @@ export function SettingsPage() {
           />
           <span>雷達頁顯示記錄按鈕（接單、上客、下客，不用切回記錄頁）</span>
         </label>
-        <p class="muted small">資訊卡的龍珠梗多久換一句</p>
-        <div class="chips">
+        <label class="toggle">
+          <input type="checkbox" checked={app.settings.memeEnabled} onChange={(e) => void setRadar({ memeEnabled: e.currentTarget.checked })} />
+          <span>顯示龍珠梗</span>
+        </label>
+        {app.settings.memeEnabled && <p class="muted small">龍珠梗多久換一句（一整天都不會重複）</p>}
+        {app.settings.memeEnabled && <div class="chips">
           {(
             [
               [30, '30 秒'],
@@ -233,7 +237,6 @@ export function SettingsPage() {
               [120, '2 分鐘'],
               [300, '5 分鐘'],
               [600, '10 分鐘'],
-              [0, '不顯示'],
             ] as const
           ).map(([k, label]) => (
             <button
@@ -245,7 +248,7 @@ export function SettingsPage() {
               {label}
             </button>
           ))}
-        </div>
+        </div>}
         <p class="muted small">縮放按鈕的位置</p>
         <div class="chips">
           {(

@@ -105,9 +105,12 @@ export async function getSettings(): Promise<Settings> {
   // 縮放按鈕不再放上方角落
   if (!['bl', 'bc', 'br'].includes(out.radarCorner)) out.radarCorner = DEFAULT_SETTINGS.radarCorner;
   // 龍珠梗間隔只剩 30 秒～10 分鐘幾個選項，舊的 15 秒、3 分鐘換成最接近的
-  if (out.memeIntervalSec !== 0 && ![30, 60, 120, 300, 600].includes(out.memeIntervalSec)) {
-    out.memeIntervalSec = out.memeIntervalSec < 30 ? 30 : 120;
+  // 「不顯示」改成獨立開關
+  if (out.memeIntervalSec === 0) {
+    out.memeEnabled = false;
+    out.memeIntervalSec = 30;
   }
+  if (![30, 60, 120, 300, 600].includes(out.memeIntervalSec)) out.memeIntervalSec = out.memeIntervalSec < 30 ? 30 : 120;
   return out;
 }
 
