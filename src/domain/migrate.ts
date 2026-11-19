@@ -12,6 +12,7 @@ export function migrateTripV1(t: ImportedTrip): ImportedTrip {
 
 /** 舊版備份檔匯入前先升級 */
 export function migrateBackup(b: BackupFile): BackupFile {
-  if (b.schemaVersion >= 2) return b;
-  return { ...b, importedTrips: b.importedTrips.map(migrateTripV1), importedIdle: b.importedIdle ?? [] };
+  let out = { ...b, importedIdle: b.importedIdle ?? [], importedBonus: b.importedBonus ?? [] };
+  if (b.schemaVersion < 2) out = { ...out, importedTrips: b.importedTrips.map(migrateTripV1) };
+  return out;
 }

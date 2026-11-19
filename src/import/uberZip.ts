@@ -1,12 +1,15 @@
-// 在瀏覽器（或 Node 測試）裡讀 Uber zip：只解壓需要的 3 個 CSV，其他檔案（含個資）不碰。
+// 在瀏覽器（或 Node 測試）裡讀 Uber zip：只解壓需要的 4 個 CSV，其他檔案（含個資）不碰。
 import JSZip from 'jszip';
 import Papa from 'papaparse';
-import type { ImportedIdle, ImportedTrip } from '../db/types';
+import type { ImportedBonus, ImportedIdle, ImportedTrip } from '../db/types';
 import {
   ANALYTICS_COLUMNS,
   UBER_FILES,
   UberFormatError,
+  BONUS_COLUMNS,
   attachPaths,
+  bonusesFromRows,
+  checkBonusHeader,
   checkAnalyticsHeader,
   checkStatesHeader,
   checkTripsHeader,
@@ -20,6 +23,7 @@ import {
 export interface UberParsed {
   trips: ImportedTrip[];
   idle: ImportedIdle[];
+  bonus: ImportedBonus[];
   points: number;
   /** zip 裡有、但沒有讀的檔案（給使用者看，讓他知道個資沒有被載入） */
   skipped: string[];
@@ -122,8 +126,9 @@ export async function parseUberZip(data: Blob | ArrayBuffer | Uint8Array, progre
   const tripsName = find(UBER_FILES.trips);
   const statesName = find(UBER_FILES.states);
   const analyticsName = find(UBER_FILES.analytics);
+  const bonusName = find(UBER_FILES.bonus);
   if (!tripsName) throw new UberFormatError('zip 裡找不到 driver_lifetime_trips（職業駕駛終身行程）');
-  const used = new Set([tripsName, statesName, analyticsName].filter(Boolean));
+  const used = new Set([tripsName, statesName, analyticsName, bonusName].filter(Boolean));
   const skipped = names.filter((n) => !used.has(n));
   const now = Date.now();
 
@@ -163,5 +168,12 @@ export async function parseUberZip(data: Blob | ArrayBuffer | Uint8Array, progre
     points = pts.length;
     attachPaths(idle, pts);
   }
-  return { trips, idle, points, skipped };
+  let bonus: ImportedBonus[] = [];
+  if (bonusName) {
+    // 只讀日期、金額、類型、說明
+    const rows: Row[] = [];
+    parseCsv(await readText(zip, bonusName), checkBonusHeader, (r) => rows.push(r), BONUS_COLUMNS);
+    bonus = bonusesFromRows(rows, now);
+  }
+  return { trips, idle, bonus, points, skipped };
 }

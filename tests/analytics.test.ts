@@ -301,4 +301,15 @@ describe('統計頁納入官方歷史', () => {
     expect([w2!.trips, w2!.earnings]).toEqual([0, 0]);
     expect(w2!.onlineHours).toBeCloseTo(2);
   });
+
+  it('每週：趟獎與服務費折扣算進實收與時薪，其他獎勵不算', () => {
+    const t0 = Date.UTC(2026, 2, 2, 1, 0); // 台北週一 09:00
+    const idle: ImportedIdle = { id: 'i', source: 'uber_zip', start: t0, end: t0 + H, endedWithOrder: false, path: null, updatedAt: 0 };
+    const b = (id: string, amount: number, kind: 'quest' | 'fee_discount' | 'other') =>
+      ({ id, source: 'uber_zip' as const, ts: t0 + 2 * H, amount, kind, label: '', updatedAt: 0 });
+    const [w] = weekly([], new Map(), S, t0 + 10 * H, 8, {
+      trips: [], idle: [idle], bonus: [b('q', 100, 'quest'), b('f', 20, 'fee_discount'), b('o', 500, 'other')],
+    });
+    expect([w!.bonus, w!.earnings, w!.hourly]).toEqual([120, 120, 120]);
+  });
 });

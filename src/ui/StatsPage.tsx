@@ -96,7 +96,10 @@ export function StatsPage() {
                 <tr key={w.key}>
                   <td>{w.key.slice(5)}</td>
                   <td>{w.trips}</td>
-                  <td>{money(w.earnings)}</td>
+                  <td>
+                    {money(w.earnings)}
+                    {w.bonus > 0 && <div class="muted small">含獎 {money(w.bonus)}</div>}
+                  </td>
                   <td>{w.hourly == null ? '—' : money(w.hourly)}</td>
                 </tr>
               ))}
@@ -198,6 +201,12 @@ function MonthCard(props: { p: Period }) {
         <b>{money(p.earnings)}</b>
         <span>實收</span>
       </div>
+      {p.bonus > 0 && (
+        <div>
+          <b>{money(p.bonus)}</b>
+          <span>趟獎（已含在實收）</span>
+        </div>
+      )}
       <div>
         <b>{p.onlineHours.toFixed(1)}</b>
         <span>上線小時</span>

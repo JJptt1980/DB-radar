@@ -105,7 +105,10 @@ export function RecordPage() {
     if (app.declinePrompt && !decline) dismissDeclinePrompt();
   }, [app.declinePrompt, decline]);
 
-  const fareFor = app.fareFormFor ? app.fares.get(app.fareFormFor) : null;
+  // 沒有車資記錄（關掉「下客後填車資」時）也能事後補填
+  const fareFor = app.fareFormFor
+    ? (app.fares.get(app.fareFormFor) ?? { id: app.fareFormFor, fare: null, surge: null, tip: null, note: '', pending: false, updatedAt: 0 })
+    : null;
 
   const notice = app.notice && now - app.notice.at < 8_000 ? app.notice : null;
   const meta = app.backup;

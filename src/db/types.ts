@@ -2,7 +2,8 @@
 
 // v1 → v2（2026-11-19）：新增 importedIdle（Uber 官方資料的空車時段）；
 // 影片匯入的卡片時間改存在 requestTs（實際對照官方資料後確認是接單時間，不是上客時間）。
-export const SCHEMA_VERSION = 2;
+// v2 → v3（2026-11-19）：新增 importedBonus（Uber 官方資料的趟獎、服務費折扣等額外收入）。
+export const SCHEMA_VERSION = 3;
 
 export type EventType =
   | 'online'
@@ -81,6 +82,19 @@ export interface ImportedTrip {
   lowSupport?: boolean;
   matchedDropoffEventId?: string | null;
   raw: Record<string, string>;
+  updatedAt: number;
+}
+
+/** Uber 官方資料 miscellaneous_payments 的一筆額外收入（趟獎、服務費折扣…），沒有地點、不屬於某一趟 */
+export interface ImportedBonus {
+  id: string;
+  source: 'uber_zip';
+  /** 入帳日（台北時間當天中午） */
+  ts: number;
+  amount: number;
+  /** quest = 趟獎；fee_discount = 服務費折扣；other = 其他（遺失物歸還費、一次性補助等，不算進時薪） */
+  kind: 'quest' | 'fee_discount' | 'other';
+  label: string;
   updatedAt: number;
 }
 
@@ -167,5 +181,6 @@ export interface BackupFile {
   trackPoints: TrackPoint[];
   importedTrips: ImportedTrip[];
   importedIdle: ImportedIdle[];
+  importedBonus: ImportedBonus[];
   settings: Settings;
 }

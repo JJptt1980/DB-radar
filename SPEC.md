@@ -158,6 +158,16 @@ interface ImportedIdle {    // Uber 官方資料的空車時段（schemaVersion 
   updatedAt: number;
 }
 
+interface ImportedBonus {   // Uber 官方資料的額外收入（schemaVersion 3 新增，見 7.1）
+  id: string;               // 'uber-bonus-<日期>-<金額>-<TYPE>-<同組第幾筆>'，重複匯入會覆蓋
+  source: 'uber_zip';
+  ts: number;               // 入帳日台北時間中午
+  amount: number;
+  kind: 'quest' | 'fee_discount' | 'other';
+  label: string;
+  updatedAt: number;
+}
+
 interface Settings {
   avgSpeedKmh: number;          // 預設 25，市區平均車速，用來估開過去要多久
   roadFactor: number;           // 預設 1.3，直線距離換算道路距離
@@ -182,7 +192,7 @@ offline ──上線──▶ idle（空車）
 idle ──接單──▶ enroute（前往接客）
 enroute ──上客──▶ ontrip（載客中）
 enroute ──取消──▶ idle
-ontrip ──下客──▶ idle（並跳出車資表單）
+ontrip ──下客──▶ idle（設定「下客後填車資」打開時才跳出車資表單）
 idle ──下線──▶ offline
 idle ──拒單──▶ idle（狀態不變，只記一筆事件）
 ```
@@ -339,7 +349,8 @@ cost (元) = dist_km × costPerKm
 
 - 最上方：目前狀態（大字，例如「空車中 12 分鐘」）、本班累計（趟數、實收、時薪）。
 - 中間：依狀態只顯示可按的 1～2 顆超大按鈕。
-- 下客後彈出車資表單：車資、加成、小費（數字鍵盤）、備註；可以按「稍後再填」，列入待補清單。
+- 主要動作是畫面中間一顆大圓鈕（上線 → 接單 → 上客 → 下客 → 接單…），顏色跟著狀態，按下時短震動並有光圈擴散；拒單、下線、訂單取消是圓鈕下方的小按鈕。
+- 下客後彈出車資表單只在設定「下客後填車資」（`Settings.askFare`，預設關）打開時才發生：車資、加成、小費（數字鍵盤）、備註；可以按「稍後再填」，列入待補清單。關掉時，點今天事件裡的下客 →「編輯車資」可以事後補填；沒填的車資在匯入 Uber 官方資料時，用下客時間相差 3 分鐘內、最接近的官方行程司機實收補上（自己填過的不覆蓋）。
 - 「待補 N 筆」入口，停車時再補資料。
 - 事件列表（今天），可點進去編輯時間、位置、刪除。
 
@@ -450,12 +461,13 @@ cost (元) = dist_km × costPerKm
 |---|---|---|
 | `Driver/driver_lifetime_trips-0.csv` | 每趟的 `request_timestamp_utc`（接單）、`begintrip_timestamp_utc`（上客）、`dropoff_timestamp_utc`（下客）、`trip_distance_miles`、`trip_duration_seconds`、`status`、車資明細。**沒有地點** | 只匯入 `status = completed` 的行程，存成 `ImportedTrip`（`source: 'uber_zip'`） |
 | `Driver/driver_online_offline-0.csv` | 上線狀態的每一段：`earner_state` = open（空車）、enroute（前往接客）、ontrip（載客）、offline，有起訖 UTC 時間 | 每一段 open 存成 `ImportedIdle`；下一段是 enroute 表示接到單，offline 表示截尾 |
+| `Driver/miscellaneous_payments-0.csv` | 額外收入：`Date Created`（入帳日）、`Amount`、`TYPE`、`Description` | 存成 `ImportedBonus`（schemaVersion 3）。`TYPE` 以 Engagement 開頭 = 趟獎（quest），Service fee discount = 服務費折扣，其他（遺失物歸還費、一次性補助…）= other。quest 與服務費折扣依入帳日算進那一週、那個月的實收與時薪；other 只保存不計算。不影響雷達推薦（沒有地點，也不屬於某一趟） |
 | `Driver/driver_app_analytics-0.csv` | 最近 30 天的 App 事件：`time`（UTC）、`msg.location.lat/lng`、`msg.driver_app.driver_online` | 上線中的定位點放進對應的空車時段，當作軌跡（相隔 30 秒以上、移動 20 公尺以上才留） |
 
 - 時間一律用 UTC 欄位。`driver_online_offline` 的 `*_local` 欄位結尾雖然有 `Z`，其實是台北時間，不要用。
 - `driver_app_analytics` 也有 IMEI、IP、廣告 ID 等個資：**只讀上表三個欄位**，其他欄位不讀、不存。
 - 其他檔案（帳號資料、付款方式、客服紀錄、評分、週報表上的姓名與車牌、乘客端資料…）一律不讀。匯入預覽列出這些檔名，讓使用者知道沒有被載入。
-- `miscellaneous_payments`（挑戰獎勵等）與 `driver_fare_adjustment`（車資調整）不是每趟收入，目前不匯入。
+- `driver_fare_adjustment`（車資調整）目前不匯入。
 
 ### 7.2 司機實收
 

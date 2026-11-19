@@ -2,16 +2,16 @@
 import { useEffect, useState } from 'preact/hooks';
 import { withOfficialFares } from '../analytics/officialFares';
 import { buildStats, type StatsIndex } from '../analytics/stats';
-import type { Fare, ImportedIdle, ImportedTrip } from '../db/types';
-import { countTrackPoints, getAllImportedIdle, getAllImportedTrips, getAllTracks } from '../db/db';
+import type { Fare, ImportedBonus, ImportedIdle, ImportedTrip } from '../db/types';
+import { countTrackPoints, getAllImportedBonus, getAllImportedIdle, getAllImportedTrips, getAllTracks } from '../db/db';
 import { useAppState } from './store';
 
-let cache: { key: string; index: StatsIndex; imported: ImportedTrip[]; idle: ImportedIdle[]; fares: Map<string, Fare> } | null = null;
+let cache: { key: string; index: StatsIndex; imported: ImportedTrip[]; idle: ImportedIdle[]; bonus: ImportedBonus[]; fares: Map<string, Fare> } | null = null;
 
 export function useAnalytics(): {
   index: StatsIndex | null;
   loading: boolean;
-  official: { trips: ImportedTrip[]; idle: ImportedIdle[] } | null;
+  official: { trips: ImportedTrip[]; idle: ImportedIdle[]; bonus: ImportedBonus[] } | null;
   /** 自己填的車資＋官方資料補上的車資 */
   fares: ReadonlyMap<string, Fare> | null;
 } {
@@ -24,9 +24,9 @@ export function useAnalytics(): {
     void (async () => {
       const lastUpdate = app.events.reduce((m, e) => Math.max(m, e.updatedAt), 0);
       const fareUpdate = [...app.fares.values()].reduce((m, f) => Math.max(m, f.updatedAt), 0);
-      const [tracks, imported, idle] = await Promise.all([countTrackPoints(), getAllImportedTrips(), getAllImportedIdle()]);
+      const [tracks, imported, idle, bonus] = await Promise.all([countTrackPoints(), getAllImportedTrips(), getAllImportedIdle(), getAllImportedBonus()]);
       const s = app.settings;
-      const key = [app.events.length, lastUpdate, app.fares.size, fareUpdate, tracks, imported.length, imported.reduce((m, t) => Math.max(m, t.updatedAt), 0), idle.length,
+      const key = [app.events.length, lastUpdate, app.fares.size, fareUpdate, tracks, imported.length, imported.reduce((m, t) => Math.max(m, t.updatedAt), 0), idle.length, bonus.length,
         s.h3Res, s.holidays.join(), s.fareIncludesSurge, s.gapBreakMin, s.importWeight].join('|');
       if (cache?.key === key) return force((n) => n + 1);
       setLoading(true);
@@ -34,7 +34,7 @@ export function useAnalytics(): {
       if (cancelled) return;
       const fares = withOfficialFares(app.events, app.fares, imported);
       const index = buildStats({ events: app.events, fares, tracks: all, imported, idle, settings: s });
-      cache = { key, index, imported, idle, fares };
+      cache = { key, index, imported, idle, bonus, fares };
       setLoading(false);
       force((n) => n + 1);
     })();
@@ -46,7 +46,7 @@ export function useAnalytics(): {
   return {
     index: cache?.index ?? null,
     loading,
-    official: cache ? { trips: cache.imported, idle: cache.idle } : null,
+    official: cache ? { trips: cache.imported, idle: cache.idle, bonus: cache.bonus } : null,
     fares: cache?.fares ?? null,
   };
 }

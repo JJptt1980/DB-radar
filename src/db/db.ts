@@ -6,6 +6,7 @@ import {
   SCHEMA_VERSION,
   type BackupFile,
   type Fare,
+  type ImportedBonus,
   type ImportedIdle,
   type ImportedTrip,
   type Settings,
@@ -21,6 +22,7 @@ interface RadarDB extends DBSchema {
   trackPoints: { key: string; value: TrackPoint; indexes: { ts: number; shiftId: string } };
   importedTrips: { key: string; value: ImportedTrip; indexes: { dedupeKey: string } };
   importedIdle: { key: string; value: ImportedIdle; indexes: { start: number } };
+  importedBonus: { key: string; value: ImportedBonus };
   kv: { key: string; value: unknown };
 }
 
@@ -51,6 +53,9 @@ export function db(): Promise<IDBPDatabase<RadarDB>> {
           if (next !== cur.value) await cur.update(next);
           cur = await cur.continue();
         }
+      }
+      if (oldVersion < 3) {
+        d.createObjectStore('importedBonus', { keyPath: 'id' });
       }
     },
   });
@@ -103,12 +108,13 @@ export async function saveSettings(s: Settings): Promise<void> {
 
 export async function exportAll(): Promise<BackupFile> {
   const d = await db();
-  const [events, fares, trackPoints, importedTrips, importedIdle, settings] = await Promise.all([
+  const [events, fares, trackPoints, importedTrips, importedIdle, importedBonus, settings] = await Promise.all([
     d.getAll('events'),
     d.getAll('fares'),
     d.getAll('trackPoints'),
     d.getAll('importedTrips'),
     d.getAll('importedIdle'),
+    d.getAll('importedBonus'),
     getSettings(),
   ]);
   // 開發用假資料（id 以 dev- 開頭）不進備份
@@ -122,6 +128,7 @@ export async function exportAll(): Promise<BackupFile> {
     trackPoints: real(trackPoints),
     importedTrips,
     importedIdle,
+    importedBonus,
     settings,
   };
 }
@@ -134,10 +141,10 @@ export interface ImportResult {
 /** 合併匯入（依 id，取 updatedAt 較新者）。設定只在本機還沒存過時才採用檔案裡的。 */
 export async function mergeImport(b: BackupFile): Promise<ImportResult> {
   const d = await db();
-  const tx = d.transaction(['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle', 'kv'], 'readwrite');
+  const tx = d.transaction(['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle', 'importedBonus', 'kv'], 'readwrite');
   let added = 0;
   let updated = 0;
-  const stores = ['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle'] as const;
+  const stores = ['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle', 'importedBonus'] as const;
   for (const name of stores) {
     const store = tx.objectStore(name);
     const local = (await store.getAll()) as { id: string; updatedAt?: number }[];
@@ -156,13 +163,14 @@ export async function mergeImport(b: BackupFile): Promise<ImportResult> {
 
 export async function clearAll(): Promise<void> {
   const d = await db();
-  const tx = d.transaction(['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle', 'kv'], 'readwrite');
+  const tx = d.transaction(['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle', 'importedBonus', 'kv'], 'readwrite');
   await Promise.all([
     tx.objectStore('events').clear(),
     tx.objectStore('fares').clear(),
     tx.objectStore('trackPoints').clear(),
     tx.objectStore('importedTrips').clear(),
     tx.objectStore('importedIdle').clear(),
+    tx.objectStore('importedBonus').clear(),
     tx.objectStore('kv').clear(),
     tx.done,
   ]);
@@ -189,8 +197,8 @@ export async function saveBackupMeta(m: BackupMeta): Promise<void> {
 /** 覆蓋還原：清掉事件、車資、軌跡、匯入行程與設定，換成備份檔的內容（Drive 連結狀態保留）。 */
 export async function replaceAll(b: BackupFile): Promise<number> {
   const d = await db();
-  const tx = d.transaction(['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle', 'kv'], 'readwrite');
-  const stores = ['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle'] as const;
+  const tx = d.transaction(['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle', 'importedBonus', 'kv'], 'readwrite');
+  const stores = ['events', 'fares', 'trackPoints', 'importedTrips', 'importedIdle', 'importedBonus'] as const;
   let n = 0;
   for (const name of stores) {
     const store = tx.objectStore(name);
@@ -238,11 +246,21 @@ export async function getAllImportedIdle(): Promise<ImportedIdle[]> {
   return (await db()).getAll('importedIdle');
 }
 
-export async function putImported(trips: readonly ImportedTrip[], idle: readonly ImportedIdle[]): Promise<void> {
-  const tx = (await db()).transaction(['importedTrips', 'importedIdle'], 'readwrite');
+export async function getAllImportedBonus(): Promise<ImportedBonus[]> {
+  return (await db()).getAll('importedBonus');
+}
+
+export async function putImported(
+  trips: readonly ImportedTrip[],
+  idle: readonly ImportedIdle[],
+  bonus: readonly ImportedBonus[] = [],
+): Promise<void> {
+  const tx = (await db()).transaction(['importedTrips', 'importedIdle', 'importedBonus'], 'readwrite');
   const a = tx.objectStore('importedTrips');
   const b = tx.objectStore('importedIdle');
+  const c = tx.objectStore('importedBonus');
   for (const t of trips) void a.put(t);
   for (const i of idle) void b.put(i);
+  for (const x of bonus) void c.put(x);
   await tx.done;
 }

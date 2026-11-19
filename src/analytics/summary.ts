@@ -1,6 +1,6 @@
 // 統計頁的表格（SPEC 5.3 Phase 3 版）：最佳時段、最佳格子、每週時薪、本月總覽、挑單分析。純函式。
 import { cellToLatLng } from 'h3-js';
-import type { DeclineReason, Fare, ImportedIdle, ImportedTrip, Settings, TripEvent } from '../db/types';
+import type { DeclineReason, Fare, ImportedBonus, ImportedIdle, ImportedTrip, Settings, TripEvent } from '../db/types';
 import { deriveSegments, liveEvents } from '../domain/state';
 import { estimate, hasEnoughData, viewAt } from './model';
 import { DAY_TYPES, taipeiParts, type Slot } from './slots';
@@ -96,7 +96,10 @@ export function bestCells(index: StatsIndex, settings: Settings, top = 10): Cell
 export interface Period {
   key: string;
   trips: number;
+  /** 實收，已含 bonus */
   earnings: number;
+  /** 趟獎＋服務費折扣 */
+  bonus: number;
   surge: number;
   fareSum: number;
   onlineHours: number;
@@ -109,6 +112,8 @@ const MS_H = 3_600_000;
 export interface OfficialHistory {
   trips: readonly ImportedTrip[];
   idle: readonly ImportedIdle[];
+  /** 趟獎等額外收入：不屬於某一趟，依入帳日算進那一週、那個月 */
+  bonus?: readonly ImportedBonus[];
 }
 
 function periodsBy(
@@ -122,7 +127,7 @@ function periodsBy(
   const map = new Map<string, Period>();
   const get = (k: string) => {
     let p = map.get(k);
-    if (!p) map.set(k, (p = { key: k, trips: 0, earnings: 0, surge: 0, fareSum: 0, onlineHours: 0, hourly: null }));
+    if (!p) map.set(k, (p = { key: k, trips: 0, earnings: 0, bonus: 0, surge: 0, fareSum: 0, onlineHours: 0, hourly: null }));
     return p;
   };
   const live = liveEvents(events);
@@ -171,6 +176,13 @@ function periodsBy(
     for (const i of official.idle) {
       if (covered(i.start)) continue;
       get(keyOf(i.start)).onlineHours += (i.end - i.start) / MS_H;
+    }
+    // 遺失物歸還費、一次性補助（kind = other）和開車效率無關，不算進時薪
+    for (const b of official.bonus ?? []) {
+      if (b.kind === 'other') continue;
+      const p = get(keyOf(b.ts));
+      p.bonus += b.amount;
+      p.earnings += b.amount;
     }
   }
 

@@ -1,7 +1,7 @@
 // 設定頁「Uber 官方資料匯入」（SPEC 第 7 章、8.6 第 4 點）
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { getAllImportedIdle, getAllImportedTrips, putImported } from '../db/db';
-import type { ImportedIdle, ImportedTrip } from '../db/types';
+import type { ImportedBonus, ImportedIdle, ImportedTrip } from '../db/types';
 import { fmtDateKey } from '../domain/time';
 import { Dialog } from './Dialog';
 import { loadAll, notify, useAppState } from './store';
@@ -11,6 +11,7 @@ const money = (n: number) => `$${Math.round(n).toLocaleString('zh-TW')}`;
 interface Preview {
   trips: ImportedTrip[];
   idle: ImportedIdle[];
+  bonus: ImportedBonus[];
   videoUpdates: ImportedTrip[];
   newTrips: number;
   newIdle: number;
@@ -47,12 +48,13 @@ export function UberImportCard() {
       setPreview({
         trips: r.trips,
         idle: r.idle,
+        bonus: r.bonus,
         videoUpdates: uber.matchVideoTrips(videos, r.trips, Date.now()),
         newTrips: r.trips.filter((t) => !tripIds.has(t.id)).length,
         newIdle: r.idle.filter((t) => !idleIds.has(t.id)).length,
         points: r.points,
         skipped: r.skipped,
-        summary: uber.summarize(r.trips, r.idle, r.points),
+        summary: uber.summarize(r.trips, r.idle, r.points, r.bonus),
       });
     } catch (e) {
       setMsg({ title: '無法匯入', body: e instanceof Error ? e.message : String(e) });
@@ -67,12 +69,14 @@ export function UberImportCard() {
     setStatus('寫入中…');
     try {
       // id 由時間決定，重複匯入新的下載檔只會覆蓋同一筆，不會重複
-      await putImported([...preview.trips, ...preview.videoUpdates], preview.idle);
+      await putImported([...preview.trips, ...preview.videoUpdates], preview.idle, preview.bonus);
       await loadAll();
       refresh();
       setMsg({
         title: '匯入完成',
         body: `行程：新增 ${preview.newTrips} 趟（共 ${preview.trips.length} 趟）\n空車時段：新增 ${preview.newIdle} 段（共 ${preview.idle.length} 段）${
+          preview.bonus.length ? `\n趟獎與其他獎勵：${preview.bonus.length} 筆` : ''
+        }${
           preview.videoUpdates.length ? `\n影片行程補上準確時間：${preview.videoUpdates.length} 趟` : ''
         }`,
       });
@@ -89,7 +93,7 @@ export function UberImportCard() {
     <section class="card">
       <h2>Uber 官方資料匯入</h2>
       <p class="muted">
-        在 Uber App 申請「下載你的資料」，收到 zip 後在這裡選檔。只讀行程、上線狀態和 App 定位三個檔案；帳號、付款、客服等其他檔案不會載入。
+        在 Uber App 申請「下載你的資料」，收到 zip 後在這裡選檔。只讀行程、上線狀態、App 定位和獎勵四個檔案；帳號、付款、客服等其他檔案不會載入。
         {counts && (counts.trips || counts.idle) ? ` 已匯入 ${counts.trips} 趟、${counts.idle} 段空車時段。` : ''}
       </p>
       <button type="button" class="btn secondary" disabled={!!status} onClick={() => fileRef.current?.click()}>
@@ -119,6 +123,20 @@ export function UberImportCard() {
             </dd>
             <dt>司機實收</dt>
             <dd>{money(s.earnings)}</dd>
+            {s.quests > 0 && (
+              <>
+                <dt>趟獎</dt>
+                <dd>
+                  {s.quests} 筆、{money(s.questTotal)}
+                </dd>
+              </>
+            )}
+            {s.feeDiscountTotal > 0 && (
+              <>
+                <dt>服務費折扣</dt>
+                <dd>{money(s.feeDiscountTotal)}</dd>
+              </>
+            )}
             <dt>空車時段</dt>
             <dd>
               {s.idlePeriods} 段、{Math.round(s.idleHours)} 小時（新的 {preview.newIdle} 段）
@@ -135,7 +153,7 @@ export function UberImportCard() {
             )}
           </dl>
           <p class="muted small">
-            沒有定位的空車時段只用來判斷「哪個時段好」；有定位的會和自己按按鈕的記錄一起算「在哪裡好」。和按鈕記錄重疊的時段不會重複計算。
+            趟獎和服務費折扣算進每週、每月的實收與時薪，不影響雷達推薦的地點。沒有定位的空車時段只用來判斷「哪個時段好」；有定位的會和自己按按鈕的記錄一起算「在哪裡好」。和按鈕記錄重疊的時段不會重複計算。
           </p>
           <button type="button" class="btn secondary" onClick={() => setShowSkipped((v) => !v)}>
             {showSkipped ? '收起' : `沒有讀的檔案（${preview.skipped.length}）`}

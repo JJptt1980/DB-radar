@@ -6,7 +6,7 @@
 // - Driver/driver_app_analytics-0.csv：最近 30 天的 App 事件，有 UTC 時間、經緯度、是否上線。
 //   這個檔也有 IMEI、IP、廣告 ID 等個資，只讀時間、經緯度、上線三個欄位，其他欄位一律不讀。
 // 其他檔案（帳號、付款、客服、評分、週報表上的姓名車牌…）不讀。
-import type { ImportedIdle, ImportedTrip } from '../db/types';
+import type { ImportedBonus, ImportedIdle, ImportedTrip } from '../db/types';
 import { distanceM } from '../domain/geo';
 
 export type Row = Record<string, string>;
@@ -15,7 +15,10 @@ export const UBER_FILES = {
   trips: /driver_lifetime_trips[^/]*\.csv$/i,
   states: /driver_online_offline[^/]*\.csv$/i,
   analytics: /driver_app_analytics[^/]*\.csv$/i,
+  bonus: /miscellaneous_payments[^/]*\.csv$/i,
 };
+
+export const BONUS_COLUMNS = ['Date Created', 'Amount', 'TYPE', 'Description'] as const;
 
 /** 只讀這些欄位；其餘欄位（含個資）不保留 */
 export const ANALYTICS_COLUMNS = ['time', 'msg.location.lat', 'msg.location.lng', 'msg.driver_app.driver_online'] as const;
@@ -196,6 +199,63 @@ export function matchVideoTrips(video: readonly ImportedTrip[], official: readon
   return out;
 }
 
+export function checkBonusHeader(h: readonly string[]): void {
+  const missing = BONUS_COLUMNS.filter((c) => !h.includes(c));
+  if (missing.length) throw new UberFormatError(`miscellaneous_payments 缺少欄位：${missing.join('、')}`);
+}
+
+export function bonusKind(type: string): ImportedBonus['kind'] {
+  if (/^Engagement/i.test(type)) return 'quest';
+  if (/service fee discount/i.test(type)) return 'fee_discount';
+  return 'other';
+}
+
+/** 給人看的短標籤：「尖峰時段額外趟次挑戰：完成 10 趟（等級 1）」 */
+export function bonusLabel(type: string, description: string): string {
+  const kind = bonusKind(type);
+  if (kind === 'fee_discount') return '服務費折扣';
+  if (kind === 'other') return type;
+  const name = description.split(/[（(]/)[0]!.trim() || '趟獎';
+  const trips = description.match(/完成\s*(\d+)\s*趟/)?.[1];
+  const level = description.match(/等級\s*(\d+)/)?.[1];
+  return `${name}${trips ? `：完成 ${trips} 趟` : ''}${level ? `（等級 ${level}）` : ''}`;
+}
+
+/** 日期只有年月日（台北時間），放在當天中午，週、月歸屬才不會因時區跑掉 */
+function taipeiNoon(date: string): number | null {
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, 4);
+}
+
+/** 同一天、同金額、同類型可能有好幾筆，用出現順序區分，重複匯入同一份檔案 id 不變 */
+export function bonusesFromRows(rows: readonly Row[], now: number): ImportedBonus[] {
+  const seen = new Map<string, number>();
+  const out: ImportedBonus[] = [];
+  for (const r of rows) {
+    const ts = taipeiNoon(r['Date Created'] ?? '');
+    const amount = Number(r.Amount);
+    if (ts == null || !Number.isFinite(amount) || amount === 0) continue;
+    const type = (r.TYPE ?? '').trim();
+    const base = `${(r['Date Created'] ?? '').slice(0, 10)}-${amount}-${type}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    out.push({
+      id: `uber-bonus-${base}-${n}`,
+      source: 'uber_zip',
+      ts,
+      amount,
+      kind: bonusKind(type),
+      label: bonusLabel(type, r.Description ?? ''),
+      updatedAt: now,
+    });
+  }
+  return out;
+}
+
+/** 算進時薪的額外收入（趟獎＋服務費折扣） */
+export const countsAsEarnings = (b: ImportedBonus): boolean => b.kind !== 'other';
+
 export interface UberSummary {
   trips: number;
   firstTs: number | null;
@@ -205,9 +265,18 @@ export interface UberSummary {
   idleHours: number;
   withPath: number;
   points: number;
+  quests: number;
+  questTotal: number;
+  feeDiscountTotal: number;
 }
 
-export function summarize(trips: readonly ImportedTrip[], idle: readonly ImportedIdle[], points: number): UberSummary {
+export function summarize(
+  trips: readonly ImportedTrip[],
+  idle: readonly ImportedIdle[],
+  points: number,
+  bonus: readonly ImportedBonus[] = [],
+): UberSummary {
+  const quests = bonus.filter((b) => b.kind === 'quest');
   const ts = trips.map((t) => t.requestTs!).sort((a, b) => a - b);
   return {
     trips: trips.length,
@@ -218,5 +287,8 @@ export function summarize(trips: readonly ImportedTrip[], idle: readonly Importe
     idleHours: idle.reduce((s, p) => s + (p.end - p.start) / 3_600_000, 0),
     withPath: idle.filter((p) => p.path).length,
     points,
+    quests: quests.length,
+    questTotal: quests.reduce((s, b) => s + b.amount, 0),
+    feeDiscountTotal: bonus.filter((b) => b.kind === 'fee_discount').reduce((s, b) => s + b.amount, 0),
   };
 }

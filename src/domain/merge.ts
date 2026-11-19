@@ -59,6 +59,7 @@ export function parseBackup(data: unknown): BackupFile {
     trackPoints: arr('trackPoints'),
     importedTrips: arr('importedTrips'),
     importedIdle: arr('importedIdle'),
+    importedBonus: arr('importedBonus'),
     settings: (d.settings && typeof d.settings === 'object' ? d.settings : {}) as BackupFile['settings'],
   });
 }

@@ -140,9 +140,10 @@ describe('資料格式升級 v1 → v2', () => {
   it('舊備份檔補上 importedIdle', () => {
     const b = migrateBackup({
       app: 'db-radar', schemaVersion: 1, exportedAt: 0, events: [], fares: [], trackPoints: [],
-      importedTrips: [], importedIdle: undefined as never, settings: {} as never,
+      importedTrips: [], importedIdle: undefined as never, importedBonus: undefined as never, settings: {} as never,
     });
     expect(b.importedIdle).toEqual([]);
+    expect(b.importedBonus).toEqual([]);
   });
 });
 
@@ -150,7 +151,7 @@ import JSZip from 'jszip';
 import { parseUberZip } from '../src/import/uberZip';
 
 describe('讀 zip（虛構檔案）', () => {
-  it('只讀三個檔案；App 分析中間有含逗號的引號欄位也能正確取出經緯度', async () => {
+  it('只讀四個檔案；App 分析中間有含逗號的引號欄位也能正確取出經緯度', async () => {
     const zip = new JSZip();
     zip.file('Uber Data/Driver/driver_lifetime_trips-0.csv',
       'status,request_timestamp_utc,begintrip_timestamp_utc,dropoff_timestamp_utc,trip_duration_seconds,original_fare_local,booking_fee_local,service_fee\n' +
@@ -166,6 +167,11 @@ describe('讀 zip（虛構檔案）', () => {
       '2026-03-02,2026-03-02 00:56:00,x,true,SECRET,", arm64-v8a",25.01,121.31,0.0,driver_app\r\n' +
       '2026-03-02,2026-03-02 01:00:00,x,true,SECRET,"a,b,c",25.02,121.32,0.0,driver_app\r\n' +
       '2026-03-02,2026-03-02 01:01:00,x,false,SECRET,"",25.03,121.33,0.0,driver_app\r\n');
+    zip.file('Uber Data/Driver/miscellaneous_payments-0.csv',
+      'Date Created,Amount,TYPE,Description\n' +
+      '2026-03-04,150.0,Engagement Hollywood BYOQ,"虛構挑戰 (Monday 2026 年 3 月 2 日 上午 4:00:00 - Friday)：您已完成 5 趟行程 (等級 1)，因此我們已將 $150.00 新增至您的費用對帳單。"\n' +
+      '2026-03-04,150.0,Engagement Hollywood BYOQ,"虛構挑戰 (同上)：您已完成 5 趟行程 (等級 1)"\n' +
+      '2026-03-05,12.5,Service fee discount,x\n');
     zip.file('Uber Data/Account and Profile/payment_methods-0.csv', 'card\n1234\n');
     const r = await parseUberZip(await zip.generateAsync({ type: 'uint8array' }));
     expect(r.trips).toHaveLength(1);
@@ -176,5 +182,12 @@ describe('讀 zip（虛構檔案）', () => {
     expect(r.idle[0]!.path!.map((p) => [p[1], p[2]])).toEqual([[25.01, 121.31], [25.02, 121.32]]);
     expect(r.skipped).toEqual(['Uber Data/Account and Profile/payment_methods-0.csv']);
     expect(JSON.stringify(r)).not.toContain('SECRET');
+    expect(r.bonus.map((b) => [b.kind, b.amount, b.label])).toEqual([
+      ['quest', 150, '虛構挑戰：完成 5 趟（等級 1）'],
+      ['quest', 150, '虛構挑戰：完成 5 趟（等級 1）'],
+      ['fee_discount', 12.5, '服務費折扣'],
+    ]);
+    expect(new Set(r.bonus.map((b) => b.id)).size).toBe(3); // 同一天同金額兩筆也不會互相覆蓋
+    expect(r.bonus[0]!.ts).toBe(Date.UTC(2026, 2, 4, 4)); // 台北中午
   });
 });
