@@ -15,7 +15,8 @@ import { useTilt } from './useTilt';
 import type { DriverState } from '../domain/state';
 import { allowedActions } from '../domain/state';
 import type { EventType } from '../db/types';
-import { press } from './store';
+import { getState, loadAll, press } from './store';
+import { saveSettings } from '../db/db';
 import { useAppState } from './store';
 import { useAnalytics } from './useAnalytics';
 
@@ -152,6 +153,14 @@ export function RadarPage() {
             {RECORD_TEXT[recordAction]}
           </button>
         )}
+        {/* 靠近龍珠的嗶嗶聲現在會不會響：喇叭＋聲波＝會響；喇叭打叉＝不響（關掉或載客中）。點一下切換開關 */}
+        <SoundBadge
+          on={app.settings.radarSound}
+          muted={app.status.state === 'ontrip'}
+          onToggle={() =>
+            void saveSettings({ ...getState().settings, radarSound: !getState().settings.radarSound }).then(loadAll)
+          }
+        />
       </RadarCanvas>
       <p class="radar-foot">
         {slotLabel(slot)}・資料 {tripCount} 趟
@@ -212,6 +221,27 @@ export function RadarPage() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+function SoundBadge(props: { on: boolean; muted: boolean; onToggle: () => void }) {
+  const live = props.on && !props.muted;
+  const label = !props.on ? '靠近龍珠的嗶嗶聲：關' : props.muted ? '載客中，嗶嗶聲暫停' : '靠近龍珠的嗶嗶聲：開';
+  return (
+    <button type="button" class={live ? 'radar-sound on' : 'radar-sound'} onClick={props.onToggle} aria-label={label} title={label}>
+      <svg viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor" />
+        {live ? (
+          <>
+            <path d="M16 9.5a3.5 3.5 0 0 1 0 5" />
+            <path d="M19.5 7a7 7 0 0 1 0 10" />
+            <path d="M23 4.5a10.5 10.5 0 0 1 0 15" />
+          </>
+        ) : (
+          <path d="M17 8.5l7 7M24 8.5l-7 7" />
+        )}
+      </svg>
+    </button>
   );
 }
 
