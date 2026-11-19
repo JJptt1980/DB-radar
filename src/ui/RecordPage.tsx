@@ -11,6 +11,7 @@ import { useWakeLock } from '../sensors/wakeLock';
 import { Dialog } from './Dialog';
 import { EventEditor, REASON_LABEL } from './EventEditor';
 import { FareForm } from './FareForm';
+import { memeAt } from './memes';
 import {
   DECLINE_PROMPT_MS,
   UNDO_MS,
@@ -180,6 +181,13 @@ export function RecordPage() {
         )}
         <GpsLine status={gps.status} accuracy={gps.fix?.accuracy ?? null} />
       </section>
+
+      {/* 下線時看的是記錄頁（雷達頁沒有下線按鈕），龍珠梗就放這裡 */}
+      {state === 'offline' && app.settings.memeEnabled && (
+        <div class="meme-line" key={memeAt('offline', now, app.settings.memeIntervalSec)}>
+          {memeAt('offline', now, app.settings.memeIntervalSec)}
+        </div>
+      )}
 
       {notice && <section class={notice.bad ? 'toast warn-toast' : 'toast'}>{notice.text}</section>}
 
