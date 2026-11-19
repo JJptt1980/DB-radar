@@ -509,26 +509,37 @@ body { overflow-x: hidden; }
   transform: translateX(-50%);
 }
 
-/* 音效提示：雷達右上角，喇叭＋聲波＝靠近龍珠會嗶；打叉＝不會 */
+/*
+ * 音效提示：雷達右上角一個小喇叭，不搶畫面。
+ * 會響（綠）：像呼吸一樣慢慢浮動；正在嗶：跟著嗶聲閃，越近閃越多越快（同 playNear 的節奏）。
+ * 不會響（灰、打叉）：淡淡的不動。
+ */
 .radar-sound {
   position: absolute;
   z-index: 2;
-  top: 0;
-  right: 0;
-  width: 52px;
-  height: 40px;
+  top: 2px;
+  right: 6px;
+  width: 36px;
+  height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: none;
   color: var(--muted);
+  opacity: 0.45;
   display: grid;
   place-items: center;
   cursor: pointer;
 }
-.radar-sound svg { width: 30px; height: 22px; }
-.radar-sound.on { color: var(--accent); }
+.radar-sound svg { width: 26px; height: 19px; }
+.radar-sound.on { color: var(--accent); animation: sound-breathe 3.2s ease-in-out infinite; }
+.radar-sound.beep-1 { animation: sound-blink 0.22s steps(1, end) 2, sound-breathe 3.2s ease-in-out 0.44s infinite; }
+.radar-sound.beep-2 { animation: sound-blink 0.16s steps(1, end) 3, sound-breathe 3.2s ease-in-out 0.48s infinite; }
+.radar-sound.beep-3 { animation: sound-blink 0.1s steps(1, end) 5, sound-breathe 3.2s ease-in-out 0.5s infinite; }
+@keyframes sound-breathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.75; } }
+@keyframes sound-blink { 0% { opacity: 1; } 50% { opacity: 0.15; } }
+@media (prefers-reduced-motion: reduce) {
+  .radar-sound.on { animation: none; opacity: 0.6; }
+}
 
 /* 記錄按鈕：小小的，放在雷達左上角，不搶畫面 */
 .radar-record {

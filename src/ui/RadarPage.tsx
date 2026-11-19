@@ -33,10 +33,10 @@ const CONF_ALPHA = { low: 0.45, mid: 0.75, high: 1 } as const;
 const RECORD_TEXT: Partial<Record<EventType, string>> = { online: '上線', accept: '接單', pickup: '上客', dropoff: '下客' };
 
 /** 靠近龍珠（雷達上任何一個熱點）時嗶嗶：進入 500／250／100 公尺各響一次，越近嗶越多越快 */
-function useNearBeep(dots: readonly Candidate[], on: boolean) {
+function useNearBeep(dots: readonly Candidate[], on: boolean, onBeep: (band: number) => void) {
   const memory = useRef(new Map<string, number>());
-  const latest = useRef({ dots, on });
-  latest.current = { dots, on };
+  const latest = useRef({ dots, on, onBeep });
+  latest.current = { dots, on, onBeep };
   useEffect(
     () =>
       onFix((f) => {
@@ -47,6 +47,7 @@ function useNearBeep(dots: readonly Candidate[], on: boolean) {
         );
         if (band && enabled) {
           playNear(band);
+          latest.current.onBeep(band);
           try {
             navigator.vibrate?.(band === 3 ? [60, 60, 60] : 40);
           } catch {
@@ -113,7 +114,9 @@ export function RadarPage() {
   const beepDots = useMemo(() => (enough && rec ? rec.candidates.filter((c) => hasEnoughData(c)) : []), [enough, rec]);
   // 載客中不出聲（乘客在車上）；前往接客時目標是乘客不是龍珠，也不嗶
   const quiet = app.status.state === 'ontrip';
-  useNearBeep(beepDots, app.settings.radarSound && app.status.state === 'idle');
+  // 嗶的時候讓右上角的喇叭跟著閃（換 key 讓動畫重播）
+  const [beep, setBeep] = useState<{ band: number; at: number } | null>(null);
+  useNearBeep(beepDots, app.settings.radarSound && app.status.state === 'idle', (band) => setBeep({ band, at: Date.now() }));
   const recordAction = allowedActions(app.status.state).find((a) => a in RECORD_TEXT);
 
   return (
@@ -155,6 +158,8 @@ export function RadarPage() {
         )}
         {/* 靠近龍珠的嗶嗶聲現在會不會響：喇叭＋聲波＝會響；喇叭打叉＝不響（關掉或載客中）。點一下切換開關 */}
         <SoundBadge
+          key={beep?.at ?? 0}
+          beepBand={beep && Date.now() - beep.at < 1500 ? beep.band : 0}
           on={app.settings.radarSound}
           muted={app.status.state === 'ontrip'}
           onToggle={() =>
@@ -224,11 +229,17 @@ export function RadarPage() {
   );
 }
 
-function SoundBadge(props: { on: boolean; muted: boolean; onToggle: () => void }) {
+function SoundBadge(props: { on: boolean; muted: boolean; beepBand: number; onToggle: () => void }) {
   const live = props.on && !props.muted;
   const label = !props.on ? '靠近龍珠的嗶嗶聲：關' : props.muted ? '載客中，嗶嗶聲暫停' : '靠近龍珠的嗶嗶聲：開';
   return (
-    <button type="button" class={live ? 'radar-sound on' : 'radar-sound'} onClick={props.onToggle} aria-label={label} title={label}>
+    <button
+      type="button"
+      class={`radar-sound${live ? ' on' : ''}${live && props.beepBand ? ` beep-${props.beepBand}` : ''}`}
+      onClick={props.onToggle}
+      aria-label={label}
+      title={label}
+    >
       <svg viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor" />
         {live ? (
