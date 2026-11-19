@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import type { Settings } from '../db/types';
 import { addFakeData, clearAll, clearFakeData, countTrackPoints, saveSettings, FAKE_PREFIX } from '../db/db';
 import { startOfTaipeiDay } from '../domain/time';
 import { lastFix } from '../sensors/gps';
@@ -36,6 +37,10 @@ export function SettingsPage() {
 
   const toggleSweep = async (on: boolean) => {
     await saveSettings({ ...getState().settings, radarSweep: on });
+    await loadAll();
+  };
+  const setRadar = async (patch: Partial<Settings>) => {
+    await saveSettings({ ...getState().settings, ...patch });
     await loadAll();
   };
   const toggleAskFare = async (on: boolean) => {
@@ -181,6 +186,30 @@ export function SettingsPage() {
           />
           <span>掃描線動畫（純裝飾，關掉比較省電）</span>
         </label>
+        <label class="toggle">
+          <input type="checkbox" checked={app.settings.radarSound} onChange={(e) => void setRadar({ radarSound: e.currentTarget.checked })} />
+          <span>縮放按鈕音效</span>
+        </label>
+        <p class="muted small">縮放按鈕放在哪個角落</p>
+        <div class="chips">
+          {(
+            [
+              ['tl', '左上'],
+              ['tr', '右上'],
+              ['bl', '左下'],
+              ['br', '右下'],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              class={app.settings.radarCorner === k ? 'chip active' : 'chip'}
+              onClick={() => void setRadar({ radarCorner: k })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section class="card">

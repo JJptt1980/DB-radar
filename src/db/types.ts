@@ -131,6 +131,10 @@ export interface Settings {
   radarSweep: boolean;
   /** 下客後跳出車資表單；關掉時車資等匯入 Uber 官方資料再自動補上 */
   askFare: boolean;
+  /** 雷達縮放按鈕放在哪個角落 */
+  radarCorner: 'tl' | 'tr' | 'bl' | 'br';
+  /** 雷達縮放按鈕的音效 */
+  radarSound: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -150,6 +154,8 @@ export const DEFAULT_SETTINGS: Settings = {
   googleClientId: '',
   radarSweep: true,
   askFare: false,
+  radarCorner: 'br',
+  radarSound: true,
 };
 
 /** Drive 備份狀態，存在 kv（不進備份檔） */

@@ -7,12 +7,18 @@ import { lastFix, onFix } from '../sensors/gps';
 import { useHeading } from '../sensors/heading';
 import { useWakeLock } from '../sensors/wakeLock';
 import { Dialog } from './Dialog';
+import { clampRange, clusterDots, clusterRadius, nextZoom, niceStep, zoomStage, type Placed } from './radarZoom';
+import { playZoom } from './radarSound';
 import { useAppState } from './store';
 import { useAnalytics } from './useAnalytics';
 
 const RECALC_MS = 30_000;
 const RECALC_MOVE_M = 200;
-const MAX_DOTS = 8;
+/** 雷達上最多放幾個候選格（附近的會合成一個點） */
+const MAX_DOTS = 40;
+/** 螢幕上距離這麼近的點合成一個 */
+const CLUSTER_PX = 30;
+const ZOOM_KEY = 'dbradar-radar-range';
 const SAFETY_KEY = 'dbradar-radar-safety-ack';
 const CONF_LABEL = { low: '低', mid: '中', high: '高' } as const;
 const CONF_ALPHA = { low: 0.45, mid: 0.75, high: 1 } as const;
@@ -56,7 +62,7 @@ export function RadarPage() {
   const { index, loading } = useAnalytics();
   const heading = useHeading();
   const calc = useCalcPosition(app.settings.homeCenter);
-  const [picked, setPicked] = useState<Candidate | null>(null);
+  const [picked, setPicked] = useState<{ c: Candidate; count: number } | null>(null);
   const [safetyAck, setSafetyAck] = useState(readFlag);
   useWakeLock(true);
 
@@ -77,9 +83,10 @@ export function RadarPage() {
         best={enough && rec && !rec.stay ? rec.best : null}
         heading={heading.deg}
         maxKm={app.settings.maxRadarKm}
-        rings={app.settings.radarRingsKm}
         sweep={app.settings.radarSweep}
-        onPick={setPicked}
+        corner={app.settings.radarCorner}
+        sound={app.settings.radarSound}
+        onPick={(c, count) => setPicked({ c, count })}
       />
       <p class="radar-foot">
         {slotLabel(slot)}・資料 {tripCount} 趟
@@ -88,37 +95,37 @@ export function RadarPage() {
         {!calc.real && '・還沒有定位，先用預設中心'}
       </p>
 
-      {picked && (
-        <Dialog title={`${compassLabel(picked.bearing)} ${picked.straightKm.toFixed(1)} km`} onClose={() => setPicked(null)}>
+      {picked && (() => { const pc = picked.c; return (
+        <Dialog title={`${compassLabel(pc.bearing)} ${pc.straightKm.toFixed(1)} km${picked.count > 1 ? `（這一區 ${picked.count} 格）` : ''}`} onClose={() => setPicked(null)}>
           <dl class="facts">
             <dt>預期時薪</dt>
-            <dd>{money(picked.score)}</dd>
+            <dd>{money(pc.score)}</dd>
             <dt>預期等待</dt>
-            <dd>{mins(picked.W)}</dd>
+            <dd>{mins(pc.W)}</dd>
             <dt>開過去</dt>
             <dd>
-              {mins(picked.T)}（約 {picked.distKm.toFixed(1)} km）
+              {mins(pc.T)}（約 {pc.distKm.toFixed(1)} km）
             </dd>
             <dt>每單實收</dt>
-            <dd>{money(picked.V)}</dd>
+            <dd>{money(pc.V)}</dd>
             <dt>每單耗時</dt>
-            <dd>{mins(picked.D)}</dd>
+            <dd>{mins(pc.D)}</dd>
             <dt>派單率</dt>
-            <dd>{picked.offerRate == null ? '—' : `每小時 ${picked.offerRate.toFixed(1)} 單`}</dd>
+            <dd>{pc.offerRate == null ? '—' : `每小時 ${pc.offerRate.toFixed(1)} 單`}</dd>
             <dt>拒單比</dt>
-            <dd>{picked.declineRatio == null ? '—' : `${Math.round(picked.declineRatio * 100)}%`}</dd>
+            <dd>{pc.declineRatio == null ? '—' : `${Math.round(pc.declineRatio * 100)}%`}</dd>
             <dt>樣本</dt>
             <dd>
-              空車 {picked.idleHours.toFixed(1)} 小時、{picked.orders.toFixed(0)} 單（附近共 {picked.nearbyHours.toFixed(1)} 小時）
+              空車 {pc.idleHours.toFixed(1)} 小時、{pc.orders.toFixed(0)} 單（附近共 {pc.nearbyHours.toFixed(1)} 小時）
             </dd>
             <dt>信心度</dt>
-            <dd>{CONF_LABEL[picked.confidence]}</dd>
+            <dd>{CONF_LABEL[pc.confidence]}</dd>
           </dl>
           <button type="button" class="btn primary" onClick={() => setPicked(null)}>
             好
           </button>
         </Dialog>
-      )}
+      ); })()}
 
       {!safetyAck && (
         <Dialog title="開車注意" onClose={() => undefined}>
@@ -207,29 +214,52 @@ const COLORS = {
   sweep: 'rgba(160, 255, 180, 0.22)',
 };
 
+function readRange(maxKm: number): number {
+  try {
+    const v = Number(localStorage.getItem(ZOOM_KEY));
+    return v > 0 ? clampRange(v, maxKm) : maxKm;
+  } catch {
+    return maxKm;
+  }
+}
+function saveRange(km: number) {
+  try {
+    localStorage.setItem(ZOOM_KEY, String(km));
+  } catch {
+    // 存不起來就算了
+  }
+}
+
 function RadarCanvas(props: {
   dots: Candidate[];
   best: Candidate | null;
   heading: number | null;
   maxKm: number;
-  rings: number[];
   sweep: boolean;
-  onPick: (c: Candidate) => void;
+  corner: 'tl' | 'tr' | 'bl' | 'br';
+  sound: boolean;
+  onPick: (c: Candidate, count: number) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const latest = useRef(props);
   latest.current = props;
-  const placed = useRef<{ c: Candidate; x: number; y: number }[]>([]);
+  const placed = useRef<{ c: Candidate; count: number; x: number; y: number }[]>([]);
+  // 範圍：target 是要去的，shown 是畫面上的；每一幀 shown 往 target 靠，看起來是慢慢放大
+  const zoom = useRef({ target: readRange(props.maxKm), shown: readRange(props.maxKm) });
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; range: number } | null>(null);
+  const [pressed, setPressed] = useState(0);
 
   useEffect(() => {
     const canvas = ref.current!;
     const ctx = canvas.getContext('2d')!;
     let raf = 0;
     let size = 0;
+    let last = performance.now();
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
-      size = Math.min(canvas.parentElement!.clientWidth, 520);
+      size = Math.min(canvas.parentElement!.parentElement!.clientWidth, 520);
       canvas.style.width = canvas.style.height = `${size}px`;
       canvas.width = canvas.height = Math.round(size * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -239,9 +269,19 @@ function RadarCanvas(props: {
 
     const draw = (now: number) => {
       const p = latest.current;
+      const z = zoom.current;
+      z.target = clampRange(z.target, p.maxKm);
+      // 用對數空間的指數趨近，約 0.6 秒到位
+      const dt = Math.min(100, now - last);
+      last = now;
+      const k = 1 - Math.exp(-dt / 160);
+      z.shown = Math.exp(Math.log(z.shown) + (Math.log(z.target) - Math.log(z.shown)) * k);
+      if (Math.abs(Math.log(z.shown / z.target)) < 0.002) z.shown = z.target;
+      const range = z.shown;
+
       const c = size / 2;
       const R = c - 6;
-      const pxPerKm = R / p.maxKm;
+      const pxPerKm = R / range;
       const rot = ((p.heading ?? 0) * Math.PI) / 180;
       ctx.clearRect(0, 0, size, size);
 
@@ -253,35 +293,38 @@ function RadarCanvas(props: {
       ctx.fill();
       ctx.clip();
 
-      // 方格：每格 1 公里，跟著車頭方向轉
+      // 方格：格子大小跟著範圍換成好讀的距離，跟著車頭方向轉
+      const gridKm = niceStep(range / 5);
       ctx.save();
       ctx.translate(c, c);
       ctx.rotate(-rot);
       ctx.strokeStyle = COLORS.grid;
       ctx.lineWidth = 1.5;
-      const span = Math.ceil(p.maxKm * 1.5);
-      for (let k = -span; k <= span; k++) {
+      const span = Math.ceil((range * 1.5) / gridKm);
+      for (let i = -span; i <= span; i++) {
         ctx.beginPath();
-        ctx.moveTo(k * pxPerKm, -R * 1.5);
-        ctx.lineTo(k * pxPerKm, R * 1.5);
-        ctx.moveTo(-R * 1.5, k * pxPerKm);
-        ctx.lineTo(R * 1.5, k * pxPerKm);
+        ctx.moveTo(i * gridKm * pxPerKm, -R * 1.5);
+        ctx.lineTo(i * gridKm * pxPerKm, R * 1.5);
+        ctx.moveTo(-R * 1.5, i * gridKm * pxPerKm);
+        ctx.lineTo(R * 1.5, i * gridKm * pxPerKm);
         ctx.stroke();
       }
       ctx.restore();
 
-      // 距離圈
+      // 距離圈：大約三圈，距離取好讀的數字
+      const ringKm = niceStep(range / 3);
       ctx.strokeStyle = COLORS.ring;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 6]);
       ctx.fillStyle = COLORS.label;
       ctx.font = '13px system-ui, sans-serif';
-      for (const km of p.rings) {
-        if (km > p.maxKm) continue;
+      for (let km = ringKm; km <= range + 1e-9; km += ringKm) {
         ctx.beginPath();
         ctx.arc(c, c, km * pxPerKm, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillText(`${km} km`, c + 4, c - km * pxPerKm + 14);
+        // 標在右側水平線上，不會和上方的 N 疊在一起
+        const label = km < 1 ? `${Math.round(km * 1000)} m` : `${+km.toFixed(2)} km`;
+        ctx.fillText(label, c + km * pxPerKm - ctx.measureText(label).width - 4, c - 5);
       }
       ctx.setLineDash([]);
 
@@ -301,37 +344,44 @@ function RadarCanvas(props: {
         }
       }
 
-      // 熱點
-      const scores = p.dots.map((d) => d.score);
+      // 熱點：範圍外的不畫（最佳那一格例外，貼在邊緣指出方向），附近的合成一個點
+      const pts: Placed<Candidate>[] = [];
+      for (const d of p.dots) {
+        const isBest = p.best?.cell === d.cell;
+        if (d.straightKm > range && !isBest) continue;
+        const r = Math.min(R - 12, d.straightKm * pxPerKm);
+        const ang = ((d.bearing - (p.heading ?? 0)) * Math.PI) / 180;
+        pts.push({ item: d, x: c + r * Math.sin(ang), y: c - r * Math.cos(ang), score: d.score });
+      }
+      const clusters = clusterDots(pts, CLUSTER_PX);
+      const scores = clusters.map((d) => d.score);
       const hi = Math.max(...scores, 1);
       const lo = Math.min(...scores, 0);
       placed.current = [];
-      p.dots.forEach((d) => {
-        const r = Math.min(R - 10, d.straightKm * pxPerKm);
-        const ang = ((d.bearing - (p.heading ?? 0)) * Math.PI) / 180;
-        const x = c + r * Math.sin(ang);
-        const y = c - r * Math.cos(ang);
-        placed.current.push({ c: d, x, y });
-        const t = hi > lo ? (d.score - lo) / (hi - lo) : 1;
+      for (const cl of clusters) {
+        const d = cl.best;
+        placed.current.push({ c: d, count: cl.count, x: cl.x, y: cl.y });
+        const t = hi > lo ? (cl.score - lo) / (hi - lo) : 1;
         const isBest = p.best?.cell === d.cell;
         const blink = isBest ? 0.55 + 0.45 * Math.abs(Math.sin(now / 350)) : 1;
-        ctx.globalAlpha = CONF_ALPHA[d.confidence] * blink;
+        const rad = clusterRadius(cl.count);
+        ctx.globalAlpha = Math.max(0.35, CONF_ALPHA[d.confidence] * (0.55 + 0.45 * t)) * blink;
         ctx.beginPath();
-        ctx.arc(x, y, 5 + 5 * t, 0, Math.PI * 2);
+        ctx.arc(cl.x, cl.y, rad, 0, Math.PI * 2);
         ctx.fillStyle = isBest ? COLORS.best : COLORS.dot;
         ctx.fill();
         if (isBest) {
           ctx.lineWidth = 3;
           ctx.strokeStyle = COLORS.dot;
           ctx.beginPath();
-          ctx.arc(x, y, 11 + 5 * t, 0, Math.PI * 2);
+          ctx.arc(cl.x, cl.y, rad + 6, 0, Math.PI * 2);
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
-      });
+      }
       ctx.restore();
 
-      // 外框
+      // 外框（不跟著縮放）
       ctx.lineWidth = 6;
       ctx.strokeStyle = COLORS.screenEdge;
       ctx.beginPath();
@@ -376,17 +426,74 @@ function RadarCanvas(props: {
     const rect = ref.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    let best: { c: Candidate; d: number } | null = null;
+    let best: { c: Candidate; count: number; d: number } | null = null;
     for (const p of placed.current) {
       const d = Math.hypot(p.x - x, p.y - y);
-      if (d < 32 && (!best || d < best.d)) best = { c: p.c, d };
+      if (d < 32 && (!best || d < best.d)) best = { c: p.c, count: p.count, d };
     }
-    if (best) props.onPick(best.c);
+    if (best) props.onPick(best.c, best.count);
+  };
+
+  // 雙指縮放：只改圓裡的範圍，外框和頁面不動（canvas 設了 touch-action: none）
+  const spread = () => {
+    const [a, b] = [...pointers.current.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
+  const onPointerDown = (e: PointerEvent) => {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2) pinch.current = { dist: spread(), range: zoom.current.target };
+  };
+  const onPointerMove = (e: PointerEvent) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pc = pinch.current;
+    const d = spread();
+    if (pc && d > 0) {
+      const km = clampRange((pc.range * pc.dist) / d, latest.current.maxKm);
+      zoom.current.target = zoom.current.shown = km;
+    }
+  };
+  const onPointerUp = (e: PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2 && pinch.current) {
+      pinch.current = null;
+      saveRange(zoom.current.target);
+    }
+  };
+
+  const onZoomButton = () => {
+    const z = zoom.current;
+    z.target = nextZoom(z.target, props.maxKm);
+    saveRange(z.target);
+    if (props.sound) playZoom(zoomStage(z.target, props.maxKm));
+    try {
+      navigator.vibrate?.(20);
+    } catch {
+      // 不支援震動就算了
+    }
+    setPressed((n) => n + 1);
   };
 
   return (
     <div class="radar-wrap">
-      <canvas ref={ref} onClick={onClick} aria-label="熱點雷達" />
+      <div class="radar-box">
+        <canvas
+          ref={ref}
+          onClick={onClick}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          aria-label="熱點雷達"
+        />
+        <button
+          key={pressed}
+          type="button"
+          class={`radar-zoom corner-${props.corner}${pressed ? ' pressed' : ''}`}
+          onClick={onZoomButton}
+          aria-label="切換雷達範圍"
+        />
+      </div>
     </div>
   );
 }
