@@ -380,7 +380,7 @@ body { overflow-x: hidden; }
 /* 雷達頁固定一個螢幕高、不捲動：卡片和小字照內容高，剩下的空間全部給雷達，底部留位置給縮放鈕 */
 .app.fit { height: 100dvh; overflow: hidden; }
 .app.fit .topbar { display: none; } /* 雷達頁不放大標題，空間留給雷達和按鈕 */
-.app.fit .page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: calc(env(safe-area-inset-top) + 14px); padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 112px); }
+.app.fit .page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: calc(env(safe-area-inset-top) + 14px); padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 128px); }
 .app.fit .radar-page { flex: 1; min-height: 0; }
 .radar-card { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
 .card-stack { display: flex; flex-direction: column; gap: 8px; }
@@ -415,28 +415,46 @@ body { overflow-x: hidden; }
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-/* 機體：柱子從這裡伸出來，只露出上緣一小段（白色外殼，跟雷達外殼同材質） */
-.radar-zoom::after {
+/*
+ * 機體：雷達本體的圓形外殼邊緣（大圓，只露出上緣一段弧）。
+ * 頂上一道高光、往下漸暗、邊緣內陰影，看起來是有厚度的白色圓殼；柱子插進外殼的位置有一圈凹陷的座。
+ */
+.radar-zoom::before {
   content: '';
   position: absolute;
-  left: -38%;
-  right: -38%;
-  top: 82px;
-  bottom: -40px;
-  border-radius: 50% 50% 0 0 / 34px 34px 0 0;
-  background: linear-gradient(180deg, #ffffff 0%, #eceef0 40%, #cfd3d6 100%);
-  border-top: 1px solid rgba(0, 0, 0, 0.14);
-  box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.9);
+  left: calc(50% - 220px);
+  width: 440px;
+  height: 440px;
+  top: 84px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 4%, #ffffff 0%, #f6f7f8 14%, #e3e6e8 34%, #c4c9cd 62%, #a3a9ae 100%);
+  box-shadow:
+    inset 0 3px 2px rgba(255, 255, 255, 0.95),
+    inset 0 -30px 40px rgba(0, 0, 0, 0.12),
+    0 -2px 0 rgba(0, 0, 0, 0.06),
+    0 -6px 18px rgba(0, 0, 0, 0.22);
 }
-/* 短柱：圓盤和機體之間只露一小段，按下去的行程約 6px */
+/* 短柱：圓盤和外殼之間只露一小段，按下去的行程約 6px */
 .radar-zoom .body {
   position: absolute;
   display: block;
-  left: 32%;
-  right: 32%;
+  left: 33%;
+  right: 33%;
   top: 34px;
-  bottom: 0;
+  height: 58px;
   background: linear-gradient(90deg, #6a7176 0%, #b3b9bd 30%, #e2e5e7 50%, #b3b9bd 70%, #6a7176 100%);
+}
+/* 柱子插進外殼的座：一圈凹下去的橢圓 */
+.radar-zoom .body::after {
+  content: '';
+  position: absolute;
+  left: -32%;
+  right: -32%;
+  bottom: -7px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 35%, #6d7378 0%, #9ba1a6 55%, #dfe2e4 100%);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 /* 薄圓盤：白色頂面（橢圓）＋一圈很薄的側邊 */
 .radar-zoom .cap {
@@ -472,14 +490,14 @@ body { overflow-x: hidden; }
   100% { transform: none; }
 }
 
-/* 角落：大部分在螢幕外，斜向畫面中央 */
+/* 角落：45° 斜斜伸向畫面中央，左右對稱；外殼大半在螢幕外 */
 .radar-zoom.zoom-bl,
 .radar-zoom.zoom-br {
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 56px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 44px);
   transform-origin: 50% 100%;
 }
-.radar-zoom.zoom-bl { left: -8px; transform: rotate(16deg); }
-.radar-zoom.zoom-br { right: -8px; transform: rotate(-16deg); }
+.radar-zoom.zoom-bl { left: -66px; transform: rotate(45deg); }
+.radar-zoom.zoom-br { right: -66px; transform: rotate(-45deg); }
 
 /* 正下方：不旋轉，從分頁列後面冒出圓盤和一點點柱子 */
 .radar-zoom.zoom-bc {
