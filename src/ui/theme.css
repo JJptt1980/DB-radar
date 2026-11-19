@@ -376,22 +376,31 @@ body { overflow-x: hidden; }
 .radio-row .chip { flex: 1; justify-content: center; }
 
 /* ---------- 雷達 ---------- */
-.radar-page { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
+.radar-page { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+/* 雷達頁固定一個螢幕高、不捲動：卡片和小字照內容高，剩下的空間全部給雷達，底部留位置給縮放鈕 */
+.app.fit { height: 100dvh; overflow: hidden; }
+.app.fit .page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 70px); }
+.app.fit .radar-page { flex: 1; min-height: 0; }
 .radar-card { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+.card-stack { display: flex; flex-direction: column; gap: 8px; }
+.meme-line { font-size: 15px; font-weight: 600; color: var(--muted); padding: 0 4px; animation: meme-in 0.5s ease-out; }
+.radar-card.meme-only { display: flex; align-items: center; min-height: 112px; }
+.meme-big { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.3; animation: meme-in 0.5s ease-out; }
+@keyframes meme-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .meme-line, .meme-big { animation: none; } }
 .radar-main { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 12px; }
 .radar-sub { font-size: 17px; color: var(--muted); margin-top: 4px; font-weight: 600; }
 .arrow { display: inline-block; font-size: 40px; color: var(--accent); transition: transform 0.4s ease; }
-.radar-wrap { display: flex; justify-content: center; margin: 0 -20px; } /* 雷達外框頂到螢幕左右邊緣 */
+.radar-wrap { flex: 1 1 0; min-height: 0; display: flex; justify-content: center; align-items: center; margin: 0 -20px; } /* 雷達外框頂到螢幕左右邊緣 */
 .radar-box { position: relative; }
 .radar-wrap canvas { position: relative; z-index: 1; display: block; touch-action: none; }
 /* 縮放鈕佔住畫面最下方，內容留空間給它 */
-.radar-page.with-zoom { padding-bottom: 40px; }
 
 /*
  * 縮放鈕：按鈕的樣子是「一根短柱＋上面一片薄薄的圓盤」，方便手指按。
- * 固定在畫面最下方，大部分藏在分頁列與螢幕邊緣外：
- * - 左下、右下：斜斜地從角落冒出來，只露出圓盤的一小塊半圓
- * - 正下方：從分頁列後面冒出上半截
+ * 固定在畫面最下方，圓盤完整露出，下面的柱子只露一點點，其餘藏在分頁列後面：
+ * - 左下、右下：在角落微微斜向畫面中央
+ * - 正下方：正對著
  * 按下去圓盤沿著軸往下沉一下。
  */
 .radar-zoom {
@@ -425,29 +434,43 @@ body { overflow-x: hidden; }
   height: 40px;
   border-radius: 50%;
   background: radial-gradient(ellipse at 45% 40%, #ffffff 0%, #f5f6f7 50%, #e1e4e6 85%, #cdd2d5 100%);
-  box-shadow: 0 9px 0 #a9afb3, 0 9px 0 1px rgba(0, 0, 0, 0.12), 0 14px 18px rgba(0, 0, 0, 0.35);
   transition: transform 0.08s ease-out;
 }
-.radar-zoom:active .cap { transform: translateY(7px); box-shadow: 0 3px 0 #a9afb3, 0 6px 10px rgba(0, 0, 0, 0.3); }
+/* 圓盤側邊：有厚度、帶直條細紋（像錶冠），畫在頂面後面 */
+.radar-zoom .cap::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: calc(50% + 13px);
+  z-index: -1;
+  border-radius: 0 0 50% 50% / 0 0 60% 60%;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.25) 45%, rgba(0, 0, 0, 0.3)),
+    repeating-linear-gradient(90deg, #c9ced1 0 3px, #9da4a8 3px 5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+}
+.radar-zoom:active .cap { transform: translateY(7px); }
 .radar-zoom.pressed .cap { animation: zoom-push 0.22s ease-out; }
 @keyframes zoom-push {
-  0% { transform: translateY(7px); box-shadow: 0 3px 0 #a9afb3, 0 6px 10px rgba(0, 0, 0, 0.3); }
+  0% { transform: translateY(7px); }
   100% { transform: none; }
 }
 
 /* 角落：大部分在螢幕外，斜向畫面中央 */
 .radar-zoom.zoom-bl,
 .radar-zoom.zoom-br {
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 52px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 66px);
   transform-origin: 50% 100%;
 }
-.radar-zoom.zoom-bl { left: -50px; transform: rotate(40deg); }
-.radar-zoom.zoom-br { right: -50px; transform: rotate(-40deg); }
+.radar-zoom.zoom-bl { left: -6px; transform: rotate(18deg); }
+.radar-zoom.zoom-br { right: -6px; transform: rotate(-18deg); }
 
 /* 正下方：不旋轉，從分頁列後面冒出圓盤和一點點柱子 */
 .radar-zoom.zoom-bc {
   left: 50%;
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 66px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 64px);
   transform: translateX(-50%);
 }
 

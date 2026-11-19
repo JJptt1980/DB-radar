@@ -53,3 +53,16 @@ describe('靠近熱點的距離分段', () => {
     expect([nearBand(800), nearBand(400), nearBand(200), nearBand(50)]).toEqual([0, 1, 2, 3]);
   });
 });
+
+import { MEMES, memeAt } from '../src/ui/memes';
+
+describe('龍珠梗', () => {
+  it('每段時間換一句，依狀態分組，循環不重複', () => {
+    const a = memeAt('idle', 0, 30);
+    expect(memeAt('idle', 29_000, 30)).toBe(a);
+    expect(memeAt('idle', 30_000, 30)).not.toBe(a);
+    expect(MEMES.ontrip).toContain(memeAt('ontrip', 123_456, 30));
+    const seen = new Set(Array.from({ length: MEMES.idle.length }, (_, i) => memeAt('idle', i * 30_000, 30)));
+    expect(seen.size).toBe(MEMES.idle.length);
+  });
+});

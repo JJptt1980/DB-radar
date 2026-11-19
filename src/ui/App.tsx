@@ -33,7 +33,7 @@ export function App() {
   const current = TABS.find((t) => t.id === tab)!;
 
   return (
-    <div class="app">
+    <div class={tab === 'radar' ? 'app fit' : 'app'}>
       <header class="topbar">
         <h1>{current.label}</h1>
         {!online && <span class="badge">離線中</span>}

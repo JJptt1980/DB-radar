@@ -220,6 +220,27 @@ export function SettingsPage() {
           />
           <span>雷達頁顯示記錄按鈕（接單、上客、下客，不用切回記錄頁）</span>
         </label>
+        <p class="muted small">資訊卡的龍珠梗多久換一句</p>
+        <div class="chips">
+          {(
+            [
+              [15, '15 秒'],
+              [30, '30 秒'],
+              [60, '1 分鐘'],
+              [180, '3 分鐘'],
+              [0, '不顯示'],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              class={app.settings.memeIntervalSec === k ? 'chip active' : 'chip'}
+              onClick={() => void setRadar({ memeIntervalSec: k })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <p class="muted small">縮放按鈕的位置</p>
         <div class="chips">
           {(

@@ -10,6 +10,8 @@ import { useWakeLock } from '../sensors/wakeLock';
 import { Dialog } from './Dialog';
 import { clampRange, clusterDots, clusterRadius, fitRange, nearBand, nextZoom, niceStep, zoomStage, type Placed } from './radarZoom';
 import { playNear, playZoom } from './radarSound';
+import { memeAt } from './memes';
+import type { DriverState } from '../domain/state';
 import { allowedActions } from '../domain/state';
 import type { EventType } from '../db/types';
 import { press } from './store';
@@ -114,7 +116,14 @@ export function RadarPage() {
 
   return (
     <div class="radar-page with-zoom">
-      <TopCard rec={rec} enough={enough} heading={heading.deg} loading={loading || !index} />
+      <TopCard
+        rec={rec}
+        enough={enough}
+        heading={heading.deg}
+        loading={loading || !index}
+        state={app.status.state}
+        memeSec={app.settings.memeIntervalSec}
+      />
       <RadarCanvas
         dots={enough ? dots : []}
         best={enough && rec && !rec.stay ? rec.best : null}
@@ -204,7 +213,51 @@ export function RadarPage() {
   );
 }
 
-function TopCard(props: { rec: Recommendation | null; enough: boolean; heading: number | null; loading: boolean }) {
+function useTick(ms: number): number {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+  return now;
+}
+
+/**
+ * 資訊卡：空車、下線時顯示推薦，上面一行小字是龍珠梗；
+ * 前往接客、載客中推薦已經沒有意義，整張卡只放梗。
+ */
+function TopCard(props: {
+  rec: Recommendation | null;
+  enough: boolean;
+  heading: number | null;
+  loading: boolean;
+  state: DriverState;
+  memeSec: number;
+}) {
+  const now = useTick(1000);
+  const meme = props.memeSec > 0 ? memeAt(props.state, now, props.memeSec) : null;
+  if (props.state === 'enroute' || props.state === 'ontrip') {
+    return (
+      <section class="radar-card meme-only">
+        <div class="meme-big" key={meme}>
+          {meme ?? (props.state === 'ontrip' ? '載客中，安心開' : '前往接客中')}
+        </div>
+      </section>
+    );
+  }
+  return (
+    <div class="card-stack">
+      {meme && (
+        <div class="meme-line" key={meme}>
+          {meme}
+        </div>
+      )}
+      <InfoCard {...props} />
+    </div>
+  );
+}
+
+function InfoCard(props: { rec: Recommendation | null; enough: boolean; heading: number | null; loading: boolean }) {
   const { rec, enough } = props;
   if (props.loading) return <section class="radar-card muted">計算中…</section>;
   if (!rec) return <section class="radar-card muted">還沒有資料</section>;
@@ -257,11 +310,12 @@ function TopCard(props: { rec: Recommendation | null; enough: boolean; heading: 
 }
 
 const COLORS = {
-  screen: '#1d6b35',
+  // 亮一點的淺綠螢幕，配深色格線（使用者 2026-11-19 參考圖）
+  screen: '#4fae5c',
   screenEdge: '#0f3d1f',
-  grid: 'rgba(5, 30, 14, 0.75)',
-  ring: 'rgba(200, 255, 210, 0.35)',
-  label: 'rgba(225, 255, 230, 0.85)',
+  grid: 'rgba(12, 48, 20, 0.7)',
+  ring: 'rgba(240, 255, 240, 0.55)',
+  label: 'rgba(255, 255, 255, 0.95)',
   dot: '#ffd23f',
   best: '#fff3a0',
   me: '#ff3b30',
@@ -323,7 +377,7 @@ function drawGlass(ctx: CanvasRenderingContext2D, c: number, R: number) {
   ctx.clip();
   const edge = ctx.createRadialGradient(c, c, R * 0.82, c, c, R);
   edge.addColorStop(0, 'rgba(0,0,0,0)');
-  edge.addColorStop(1, 'rgba(0,20,8,0.45)');
+  edge.addColorStop(1, 'rgba(0,30,10,0.4)');
   ctx.fillStyle = edge;
   ctx.fillRect(c - R, c - R, R * 2, R * 2);
   const glare = ctx.createLinearGradient(c - R, c - R, c, c);
@@ -378,10 +432,9 @@ function RadarCanvas(props: {
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
-      // 盡量大，但整頁不超過一個螢幕高（不用上下滑）：扣掉上方卡片、下方小字與分頁列
-      const top = canvas.parentElement!.getBoundingClientRect().top + scrollY;
-      const avail = innerHeight - top - 150;
-      size = Math.max(240, Math.min(canvas.parentElement!.parentElement!.clientWidth, 520, avail));
+      // 雷達頁是固定一個螢幕高的版面，雷達區（radar-wrap）分到多少空間就畫多大
+      const wrap = canvas.parentElement!.parentElement!;
+      size = Math.max(200, Math.min(wrap.clientWidth, wrap.clientHeight, 560));
       canvas.style.width = canvas.style.height = `${size}px`;
       // 按鈕位置用這個尺寸算（CSS 變數）
       canvas.parentElement!.style.setProperty('--s', `${size}px`);
@@ -392,8 +445,7 @@ function RadarCanvas(props: {
     addEventListener('resize', resize);
     // 上方卡片內容變了（高度改變）時重新量
     const ro = new ResizeObserver(() => resize());
-    const page = canvas.closest('.radar-page');
-    if (page?.firstElementChild) ro.observe(page.firstElementChild);
+    ro.observe(canvas.parentElement!.parentElement!);
 
     const draw = (now: number) => {
       const p = latest.current;

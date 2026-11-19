@@ -141,6 +141,8 @@ export interface Settings {
   theme: 'dark' | 'light' | 'system';
   /** 雷達頁顯示記錄按鈕（接單、上客、下客…） */
   radarRecordButton: boolean;
+  /** 雷達資訊卡的龍珠梗多久換一句（秒）；0 = 不顯示 */
+  memeIntervalSec: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -164,6 +166,7 @@ export const DEFAULT_SETTINGS: Settings = {
   radarSound: true,
   theme: 'dark',
   radarRecordButton: true,
+  memeIntervalSec: 30,
 };
 
 /** Drive 備份狀態，存在 kv（不進備份檔） */
