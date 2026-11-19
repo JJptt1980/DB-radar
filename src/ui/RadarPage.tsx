@@ -268,6 +268,74 @@ const COLORS = {
   sweep: 'rgba(160, 255, 180, 0.22)',
 };
 
+/** 白色外殼：上方受光較亮、下方較暗，加一道高光和落在桌面上的陰影 */
+function drawBezel(ctx: CanvasRenderingContext2D, c: number, Ro: number, R: number) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 6;
+  const body = ctx.createLinearGradient(0, c - Ro, 0, c + Ro);
+  body.addColorStop(0, '#ffffff');
+  body.addColorStop(0.55, '#eef0f2');
+  body.addColorStop(1, '#c9cdd1');
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(c, c, Ro, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 外殼頂面的弧形高光
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(c, c, Ro, 0, Math.PI * 2);
+  ctx.arc(c, c, R + 4, 0, Math.PI * 2, true);
+  ctx.clip();
+  const shine = ctx.createRadialGradient(c - Ro * 0.45, c - Ro * 0.55, 0, c - Ro * 0.45, c - Ro * 0.55, Ro * 1.1);
+  shine.addColorStop(0, 'rgba(255,255,255,0.95)');
+  shine.addColorStop(0.5, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  ctx.fillRect(c - Ro, c - Ro, Ro * 2, Ro * 2);
+  ctx.restore();
+
+  // 外殼外緣細線
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
+  ctx.beginPath();
+  ctx.arc(c, c, Ro - 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 螢幕周圍的深色內緣（往下凹）
+  const rim = ctx.createLinearGradient(0, c - R, 0, c + R);
+  rim.addColorStop(0, '#5d6469');
+  rim.addColorStop(1, '#a7adb2');
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = rim;
+  ctx.beginPath();
+  ctx.arc(c, c, R + 2.5, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/** 玻璃：左上一片淡淡的反光，邊緣一圈內陰影 */
+function drawGlass(ctx: CanvasRenderingContext2D, c: number, R: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(c, c, R, 0, Math.PI * 2);
+  ctx.clip();
+  const edge = ctx.createRadialGradient(c, c, R * 0.82, c, c, R);
+  edge.addColorStop(0, 'rgba(0,0,0,0)');
+  edge.addColorStop(1, 'rgba(0,20,8,0.45)');
+  ctx.fillStyle = edge;
+  ctx.fillRect(c - R, c - R, R * 2, R * 2);
+  const glare = ctx.createLinearGradient(c - R, c - R, c, c);
+  glare.addColorStop(0, 'rgba(255,255,255,0.16)');
+  glare.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glare;
+  ctx.beginPath();
+  ctx.ellipse(c - R * 0.25, c - R * 0.35, R * 0.75, R * 0.45, -Math.PI / 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function RadarCanvas(props: {
   dots: Candidate[];
   best: Candidate | null;
@@ -333,10 +401,14 @@ function RadarCanvas(props: {
       const range = z.shown;
 
       const c = size / 2;
-      const R = c - 6;
+      // 俯瞰的裝置：最外圈白色外殼，裡面一圈深色內緣，再裡面是綠色螢幕
+      const Ro = c - 10;
+      const bezel = Math.max(14, size * 0.07);
+      const R = Ro - bezel;
       const pxPerKm = R / range;
       const rot = ((p.heading ?? 0) * Math.PI) / 180;
       ctx.clearRect(0, 0, size, size);
+      drawBezel(ctx, c, Ro, R);
 
       // 螢幕
       ctx.save();
@@ -434,12 +506,8 @@ function RadarCanvas(props: {
       }
       ctx.restore();
 
-      // 外框（不跟著縮放）
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = COLORS.screenEdge;
-      ctx.beginPath();
-      ctx.arc(c, c, R, 0, Math.PI * 2);
-      ctx.stroke();
+      // 螢幕玻璃的反光與內緣陰影（不跟著縮放）
+      drawGlass(ctx, c, R);
 
       // 北方標示
       const nA = -rot;

@@ -1,6 +1,7 @@
 // 按鈕記錄的下客沒有填車資時，用 Uber 官方資料裡同一趟的司機實收補上（純函式）。
 import type { Fare, ImportedTrip, TripEvent } from '../db/types';
 import { liveEvents } from '../domain/state';
+import { driverEarnings, regionAt, trackKm, type Product } from './uberRates';
 
 const DAY_MS = 86_400_000;
 
@@ -94,28 +95,45 @@ export function estimateFare(model: FareModel | null, minutes: number | null, av
   return avg;
 }
 
-/** 本班還沒有車資的趟，逐趟用「上客到下客」的分鐘數估，加總 */
+/** 本班還沒有車資的趟，逐趟估實收後加總：
+ * 1. 有 GPS 軌跡算得出里程：用 Uber 費率公式（地區看上客位置、車種看接單時選的）
+ * 2. 沒有軌跡但有載客時間：用官方資料擬合的「每分鐘多少錢」
+ * 3. 都沒有：用最近平均
+ */
 export function estimateUnpriced(
   events: readonly TripEvent[],
   fares: ReadonlyMap<string, Fare>,
   shiftId: string,
   model: FareModel | null,
   avg: number | null,
+  tracks: readonly { ts: number; lat: number; lon: number }[] = [],
 ): number | null {
-  let pickupAt: number | null = null;
+  let pickup: TripEvent | null = null;
+  let product: Product = 'standard';
   let sum = 0;
   for (const e of liveEvents(events)) {
     if (e.shiftId !== shiftId) continue;
-    if (e.type === 'pickup') pickupAt = e.ts;
-    else if (e.type === 'cancel') pickupAt = null;
+    if (e.type === 'accept') product = e.product ?? 'standard';
+    else if (e.type === 'pickup') pickup = e;
+    else if (e.type === 'cancel') pickup = null;
     else if (e.type === 'dropoff') {
       const f = fares.get(e.id);
       if (!(f && !f.deleted && f.fare != null)) {
-        const est = estimateFare(model, pickupAt != null ? (e.ts - pickupAt) / 60_000 : null, avg);
+        const minutes = pickup ? (e.ts - pickup.ts) / 60_000 : null;
+        const km = pickup ? trackKm(tracks, pickup.ts, e.ts) : null;
+        let est: number | null;
+        if (pickup && minutes != null && km != null) {
+          const at = pickup.lat != null && pickup.lon != null ? pickup : e;
+          const region = at.lat != null && at.lon != null ? regionAt(at.lat, at.lon) : 'taoyuan';
+          est = driverEarnings(region, product, km, minutes);
+        } else {
+          est = estimateFare(model, minutes, avg);
+        }
         if (est == null) return null;
         sum += est;
       }
-      pickupAt = null;
+      pickup = null;
+      product = 'standard';
     }
   }
   return sum;

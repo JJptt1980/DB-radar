@@ -218,6 +218,10 @@ export async function replaceAll(b: BackupFile): Promise<number> {
   return n;
 }
 
+export async function getShiftTracks(shiftId: string): Promise<TrackPoint[]> {
+  return (await db()).getAllFromIndex('trackPoints', 'shiftId', shiftId);
+}
+
 export async function getAllTracks(): Promise<TrackPoint[]> {
   return (await db()).getAll('trackPoints');
 }

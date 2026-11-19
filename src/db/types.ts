@@ -26,6 +26,8 @@ export interface TripEvent {
   accuracy: number | null;
   source: 'button' | 'uber_import' | 'manual_edit';
   declineReason?: DeclineReason;
+  /** 車種（記在接單事件上；沒有 = 標準） */
+  product?: 'standard' | 'comfort' | 'comfort_electric' | 'black' | 'pet';
   updatedAt: number;
   deleted?: boolean;
 }

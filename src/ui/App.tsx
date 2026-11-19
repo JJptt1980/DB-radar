@@ -58,7 +58,7 @@ export function App() {
             aria-current={t.id === tab ? 'page' : undefined}
           >
             <span class="tab-icon" aria-hidden="true">
-              {t.icon}
+              <TabIcon id={t.id} />
             </span>
             <span class="tab-label">{t.label}</span>
           </a>
@@ -85,4 +85,40 @@ function Lazy(props: { load: () => Promise<ComponentType> }) {
   }, [props.load.toString()]);
   if (err) return <p class="muted">載入失敗，請確認網路後重新整理。</p>;
   return Comp ? <Comp /> : <p class="muted">載入中…</p>;
+}
+
+/** 分頁列的線條圖示（1.8px 線寬，跟著文字顏色） */
+function TabIcon(props: { id: TabId }) {
+  const common = { fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' } as const;
+  switch (props.id) {
+    case 'record':
+      return (
+        <svg viewBox="0 0 24 24" {...common}>
+          <circle cx="12" cy="12" r="8.5" />
+          <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case 'radar':
+      return (
+        <svg viewBox="0 0 24 24" {...common}>
+          <circle cx="12" cy="12" r="8.5" />
+          <circle cx="12" cy="12" r="4.5" />
+          <path d="M12 12 18 6" />
+        </svg>
+      );
+    case 'stats':
+      return (
+        <svg viewBox="0 0 24 24" {...common}>
+          <path d="M5 19V11M12 19V5M19 19v-5" />
+        </svg>
+      );
+    case 'settings':
+      return (
+        <svg viewBox="0 0 24 24" {...common}>
+          <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+          <circle cx="16" cy="7" r="2" />
+          <circle cx="8" cy="17" r="2" />
+        </svg>
+      );
+  }
 }

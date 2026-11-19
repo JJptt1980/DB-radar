@@ -70,9 +70,12 @@ export const getState = (): AppState => state;
 
 export function useAppState(): AppState {
   const [, force] = useState(0);
+  const seen = state;
   useEffect(() => {
     const l = () => force((n) => n + 1);
     listeners.add(l);
+    // 畫面掛上去之前資料就更新了（例如啟動時載入設定），補一次重繪
+    if (state !== seen) l();
     return () => void listeners.delete(l);
   }, []);
   return state;
@@ -218,6 +221,15 @@ async function refineLocation(ev: TripEvent, now: number): Promise<void> {
     accuracy: fresh.accuracy,
     updatedAt: Date.now(),
   };
+  await putEvent(updated);
+  replaceEvent(updated);
+}
+
+/** 這趟的車種記在接單事件上（不改 source，不影響之後補上的定位） */
+export async function setTripProduct(acceptId: string, product: NonNullable<TripEvent['product']>): Promise<void> {
+  const cur = state.events.find((e) => e.id === acceptId);
+  if (!cur) return;
+  const updated: TripEvent = { ...cur, product, updatedAt: Date.now() };
   await putEvent(updated);
   replaceEvent(updated);
 }

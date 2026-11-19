@@ -80,3 +80,36 @@ describe('依載客時間估車資', () => {
     expect(estimateUnpriced([ev('x', T0)], new Map(), 's', null, 200)).toBe(200);
   });
 });
+
+import { driverEarnings, regionAt, trackKm } from '../src/analytics/uberRates';
+
+describe('Uber 費率公式', () => {
+  it('桃園與北北基標準車', () => {
+    // 桃園：59 + 25×5 + 1.7×12 = 204.4 → ×0.75 = 153.3 → 153
+    expect(driverEarnings('taoyuan', 'standard', 5, 12)).toBe(153);
+    // 北北基：48 + 25×5 + 3.4×12 = 213.8 → 160.35 → 160
+    expect(driverEarnings('taipei', 'standard', 5, 12)).toBe(160);
+    // 最低車資 90 → 67.5 → .5 往下 = 67
+    expect(driverEarnings('taoyuan', 'standard', 0.5, 2)).toBe(67);
+    expect(driverEarnings('taoyuan', 'black', 5, 12)).toBeGreaterThan(driverEarnings('taoyuan', 'comfort', 5, 12));
+  });
+  it('依位置判斷地區', () => {
+    expect(regionAt(24.99, 121.31)).toBe('taoyuan'); // 桃園市區
+    expect(regionAt(25.04, 121.52)).toBe('taipei'); // 台北車站
+    expect(regionAt(25.13, 121.74)).toBe('taipei'); // 基隆
+    expect(regionAt(25.06, 121.22)).toBe('taoyuan'); // 大園附近
+  });
+  it('軌跡里程', () => {
+    const pts = [0, 1, 2].map((i) => ({ ts: i * 60_000, lat: 25 + i * 0.009, lon: 121.3 }));
+    expect(trackKm(pts, 0, 120_000)).toBeCloseTo(2 * 1.05, 1);
+    expect(trackKm(pts, 0, 10)).toBeNull();
+  });
+  it('有軌跡時用費率公式、車種看接單事件', () => {
+    const acc: TripEvent = { ...ev('a', T0 - 600_000), type: 'accept', product: 'black', lat: 24.99, lon: 121.31 };
+    const pick: TripEvent = { ...ev('p', T0), type: 'pickup', lat: 24.99, lon: 121.31 };
+    const drop = ev('d', T0 + 12 * 60_000);
+    const pts = Array.from({ length: 13 }, (_, i) => ({ ts: T0 + i * 60_000, lat: 24.99 + i * 0.00366, lon: 121.31 }));
+    const km = trackKm(pts, T0, T0 + 12 * 60_000)!;
+    expect(estimateUnpriced([acc, pick, drop], new Map(), 's', null, 200, pts)).toBe(driverEarnings('taoyuan', 'black', km, 12));
+  });
+});

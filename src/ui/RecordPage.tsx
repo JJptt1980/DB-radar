@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { EventType, ImportedTrip, TripEvent } from '../db/types';
 import { avgRecentFare, estimateUnpriced, fitFareModel, withOfficialFares } from '../analytics/officialFares';
-import { getAllImportedTrips } from '../db/db';
+import { getAllImportedTrips, getShiftTracks } from '../db/db';
+import { PRODUCT_LABEL, type Product } from '../analytics/uberRates';
 import { EVENT_LABEL, STATE_LABEL, allowedActions, liveEvents, shiftSummary } from '../domain/state';
 import { fmtDuration, fmtTime, startOfTaipeiDay } from '../domain/time';
 import { needsBackupReminder } from '../backup/policy';
@@ -17,6 +18,7 @@ import {
   dismissDeclinePrompt,
   openFareForm,
   press,
+  setTripProduct,
   setDeclineReason,
   undoLast,
   useAppState,
@@ -96,7 +98,17 @@ export function RecordPage() {
   const summary = shiftId ? shiftSummary(app.events, fares, shiftId, now) : null;
   const estimated = summary && summary.unpriced > 0;
   // 沒有車資的趟：用這趟上客到下客的分鐘數估（官方資料擬合），沒有載客時間才用平均
-  const unpricedEst = summary && shiftId && summary.unpriced ? estimateUnpriced(app.events, fares, shiftId, fareModel, avgFare) : 0;
+  const [tracks, setTracks] = useState<{ ts: number; lat: number; lon: number }[]>([]);
+  useEffect(() => {
+    if (shiftId) void getShiftTracks(shiftId).then(setTracks);
+  }, [shiftId, app.events.length]);
+  const unpricedEst =
+    summary && shiftId && summary.unpriced ? estimateUnpriced(app.events, fares, shiftId, fareModel, avgFare, tracks) : 0;
+  // 目前這趟的接單事件（前往接客、載客中才有），用來選車種
+  const currentAccept =
+    state === 'enroute' || state === 'ontrip'
+      ? [...app.events].filter((e) => !e.deleted && e.type === 'accept').sort((x, y) => y.ts - x.ts)[0] ?? null
+      : null;
   const earningsShown = summary ? summary.earnings + (unpricedEst ?? 0) : 0;
   const hours = summary ? summary.onlineMs / 3_600_000 : 0;
   const hourlyShown = summary && hours >= 0.05 && unpricedEst != null ? earningsShown / hours : null;
@@ -226,6 +238,21 @@ export function RecordPage() {
           </div>
         )}
       </section>
+
+      {currentAccept && (
+        <section class="product-row">
+          {(Object.keys(PRODUCT_LABEL) as Product[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              class={(currentAccept.product ?? 'standard') === p ? 'chip active' : 'chip'}
+              onClick={() => void setTripProduct(currentAccept.id, p)}
+            >
+              {PRODUCT_LABEL[p]}
+            </button>
+          ))}
+        </section>
+      )}
 
       {decline && (
         <section class="toast">
