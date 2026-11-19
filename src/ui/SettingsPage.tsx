@@ -198,7 +198,7 @@ export function SettingsPage() {
         <h2>成本（算淨收入用）</h2>
         <div class="field-row">
           <label class="field">
-            <span>每公里油錢＋保養（元）</span>
+            <span>每公里成本（元）</span>
             <input
               type="number"
               inputMode="decimal"
@@ -227,7 +227,7 @@ export function SettingsPage() {
           </label>
         </div>
         <p class="muted small">
-          固定支出例如車行（車隊）月費、保險、車貸、停車費。里程用 Uber 資料的載客里程 × 1.4 估算（加上開去接客和空車移動）。每公里成本也會用在雷達算「開過去划不划算」。
+          每公里成本是油錢（或電費）加保養。固定支出例如車行（車隊）月費、保險、車貸、停車費。里程用 Uber 資料的載客里程 × 1.4 估算（加上開去接客和空車移動）。每公里成本也會用在雷達算「開過去划不划算」。
         </p>
       </section>
 

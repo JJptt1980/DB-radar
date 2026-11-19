@@ -227,7 +227,7 @@ body { overflow-x: hidden; }
 .form { display: flex; flex-direction: column; gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 .field > span { color: var(--muted); font-size: 14px; font-weight: 600; }
-.field-row { display: flex; gap: 10px; }
+.field-row { display: flex; gap: 10px; align-items: flex-end; } /* 標題長短不同時，輸入框仍對齊 */
 .field input {
   min-height: 54px;
   padding: 0 14px;
