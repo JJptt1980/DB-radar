@@ -38,6 +38,10 @@ export function SettingsPage() {
     await saveSettings({ ...getState().settings, radarSweep: on });
     await loadAll();
   };
+  const toggleAskFare = async (on: boolean) => {
+    await saveSettings({ ...getState().settings, askFare: on });
+    await loadAll();
+  };
 
   const doFake = async () => {
     setBusy(true);
@@ -154,6 +158,18 @@ export function SettingsPage() {
       </section>
 
       <DriveCard />
+
+      <section class="card">
+        <h2>記錄</h2>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={app.settings.askFare}
+            onChange={(e) => void toggleAskFare(e.currentTarget.checked)}
+          />
+          <span>下客後填車資（關掉時，車資等匯入 Uber 官方資料自動補上）</span>
+        </label>
+      </section>
 
       <section class="card">
         <h2>雷達</h2>

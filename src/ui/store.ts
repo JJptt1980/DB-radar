@@ -189,7 +189,7 @@ async function recordPress(type: EventType, shiftId: string | null, now: number)
 
   const patch: Partial<AppState> = { undo: { eventId: ev.id, label: type, at: now } };
   if (type === 'offer_declined') patch.declinePrompt = { eventId: ev.id, at: now };
-  if (type === 'dropoff') {
+  if (type === 'dropoff' && state.settings.askFare) {
     const fare: Fare = { id: ev.id, fare: null, surge: null, tip: null, note: '', pending: true, updatedAt: now };
     await putFare(fare);
     replaceFare(fare);

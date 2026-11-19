@@ -67,6 +67,18 @@ export function RecordPage() {
 
   useWakeLock(true);
 
+  // 按下去的回饋：短震動＋光圈擴散（換 key 讓動畫每次重播）
+  const [pulse, setPulse] = useState(0);
+  const tap = () => {
+    try {
+      navigator.vibrate?.(40);
+    } catch {
+      // 不支援震動就算了
+    }
+    setPulse((n) => n + 1);
+  };
+  const askFare = app.settings.askFare;
+
   const actions = allowedActions(state);
   const primary = actions.filter((a) => PRIMARY.includes(a));
   const secondary = actions.filter((a) => !PRIMARY.includes(a));
@@ -125,14 +137,23 @@ export function RecordPage() {
               <b>{summary.trips}</b>
               <span>趟</span>
             </div>
-            <div>
-              <b>{money(summary.earnings)}</b>
-              <span>實收</span>
-            </div>
-            <div>
-              <b>{summary.hourly == null ? '—' : money(summary.hourly)}</b>
-              <span>時薪</span>
-            </div>
+            {askFare ? (
+              <>
+                <div>
+                  <b>{money(summary.earnings)}</b>
+                  <span>實收</span>
+                </div>
+                <div>
+                  <b>{summary.hourly == null ? '—' : money(summary.hourly)}</b>
+                  <span>時薪</span>
+                </div>
+              </>
+            ) : (
+              <div class="summary-wide">
+                <b>{fmtDuration(summary.onlineMs)}</b>
+                <span>本班上線（車資匯入官方資料後補上）</span>
+              </div>
+            )}
           </div>
         )}
         <GpsLine status={gps.status} accuracy={gps.fix?.accuracy ?? null} />
@@ -165,14 +186,30 @@ export function RecordPage() {
 
       <section class="actions">
         {primary.map((a) => (
-          <button key={a} type="button" class={`btn big act-${a}`} onClick={() => void press(a)}>
-            {BUTTON_TEXT[a]}
+          <button
+            key={`${a}-${pulse}`}
+            type="button"
+            class={`ritual act-${a}${pulse ? ' pulse' : ''}`}
+            onClick={() => {
+              tap();
+              void press(a);
+            }}
+          >
+            <span class="ritual-label">{BUTTON_TEXT[a]}</span>
           </button>
         ))}
         {secondary.length > 0 && (
           <div class="btn-row">
             {secondary.map((a) => (
-              <button key={a} type="button" class={`btn secondary act-${a}`} onClick={() => void press(a)}>
+              <button
+                key={a}
+                type="button"
+                class={`btn secondary act-${a}`}
+                onClick={() => {
+                  tap();
+                  void press(a);
+                }}
+              >
                 {BUTTON_TEXT[a]}
               </button>
             ))}
@@ -202,7 +239,7 @@ export function RecordPage() {
         </section>
       )}
 
-      {pending.length > 0 && (
+      {askFare && pending.length > 0 && (
         <button type="button" class="btn secondary pending-btn" onClick={() => setShowPending(true)}>
           待補車資 {pending.length} 筆
         </button>

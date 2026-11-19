@@ -115,6 +115,8 @@ export interface Settings {
   googleClientId: string;
   /** 雷達掃描線動畫（純裝飾，關掉省電） */
   radarSweep: boolean;
+  /** 下客後跳出車資表單；關掉時車資等匯入 Uber 官方資料再自動補上 */
+  askFare: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -133,6 +135,7 @@ export const DEFAULT_SETTINGS: Settings = {
   importWeight: 0.3,
   googleClientId: '',
   radarSweep: true,
+  askFare: false,
 };
 
 /** Drive 備份狀態，存在 kv（不進備份檔） */
