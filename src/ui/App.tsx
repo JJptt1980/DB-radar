@@ -22,7 +22,13 @@ export function App() {
     };
   }, []);
 
-  const theme = useAppState().settings.theme;
+  const settings = useAppState().settings;
+  const theme = settings.theme;
+  // 統計分頁可以在設定裡隱藏（金額比較敏感）；隱藏時停在統計頁就回到記錄頁
+  const tabs = TABS.filter((t) => !(t.id === 'stats' && settings.statsHidden));
+  useEffect(() => {
+    if (settings.statsHidden && tab === 'stats') location.hash = '#record';
+  }, [settings.statsHidden, tab]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     const light = theme === 'light' || (theme === 'system' && matchMedia('(prefers-color-scheme: light)').matches);
@@ -49,8 +55,8 @@ export function App() {
           <Lazy load={() => import('./StatsPage').then((m) => m.StatsPage)} />
         )}
       </main>
-      <nav class="tabbar" aria-label="主要分頁">
-        {TABS.map((t) => (
+      <nav class="tabbar" aria-label="主要分頁" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}>
+        {tabs.map((t) => (
           <a
             key={t.id}
             href={`#${t.id}`}

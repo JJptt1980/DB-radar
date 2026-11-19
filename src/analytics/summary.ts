@@ -199,6 +199,36 @@ export function weekKey(ts: number): string {
 
 export const monthKey = (ts: number): string => taipeiParts(ts).dateKey.slice(0, 7);
 
+/** 半年：「2026 下半年」。字串排序時同一年的下半年會排在上半年前面（下 > 上），剛好是新到舊 */
+export const halfKey = (ts: number): string => {
+  const d = taipeiParts(ts).dateKey;
+  return `${d.slice(0, 4)} ${Number(d.slice(5, 7)) <= 6 ? '上半年' : '下半年'}`;
+};
+
+export const yearKey = (ts: number): string => `${taipeiParts(ts).dateKey.slice(0, 4)} 年`;
+
+export type Grain = 'week' | 'month' | 'half' | 'year' | 'all';
+
+const KEY_OF: Record<Grain, (ts: number) => string> = {
+  week: weekKey,
+  month: monthKey,
+  half: halfKey,
+  year: yearKey,
+  all: () => '全部',
+};
+
+/** 依選的期間（週、月、半年、年、全部）加總實收、趟數、上線時數與時薪，新到舊 */
+export function periods(
+  events: readonly TripEvent[],
+  fares: ReadonlyMap<string, Fare>,
+  settings: Settings,
+  now: number,
+  grain: Grain,
+  official?: OfficialHistory,
+): Period[] {
+  return periodsBy(events, fares, settings, KEY_OF[grain], now, official);
+}
+
 export function weekly(
   events: readonly TripEvent[],
   fares: ReadonlyMap<string, Fare>,

@@ -313,3 +313,26 @@ describe('統計頁納入官方歷史', () => {
     expect([w!.bonus, w!.earnings, w!.hourly]).toEqual([120, 120, 120]);
   });
 });
+
+import { halfKey, periods, yearKey } from '../src/analytics/summary';
+
+describe('收入期間', () => {
+  it('半年與年的分組鍵（台北時間）', () => {
+    expect(halfKey(Date.UTC(2026, 5, 30, 15))).toBe('2026 上半年'); // 台北 6/30 23:00
+    expect(halfKey(Date.UTC(2026, 5, 30, 17))).toBe('2026 下半年'); // 台北 7/1 01:00
+    expect(yearKey(Date.UTC(2025, 11, 31, 17))).toBe('2026 年');
+  });
+  it('依期間加總官方行程，新到舊', () => {
+    const t = (id: string, ts: number, fare: number): ImportedTrip => ({
+      id, source: 'uber_zip', externalId: null, dedupeKey: id, requestTs: ts, pickupTs: ts, dropoffTs: ts + 3_600_000,
+      durationSec: 3600, distanceKm: 1, pickupLat: null, pickupLon: null, dropoffLat: null, dropoffLon: null,
+      pickupAddress: null, dropoffAddress: null, pickupPrecision: null, dropoffPrecision: null,
+      fare, surge: 0, product: null, matchedDropoffEventId: null, raw: {}, updatedAt: 0,
+    });
+    const trips = [t('a', Date.UTC(2026, 1, 1, 4), 100), t('b', Date.UTC(2026, 8, 1, 4), 300), t('c', Date.UTC(2025, 8, 1, 4), 50)];
+    const half = periods([], new Map(), S, Date.UTC(2026, 10, 1), 'half', { trips, idle: [] });
+    expect(half.map((p) => [p.key, p.earnings])).toEqual([['2026 下半年', 300], ['2026 上半年', 100], ['2025 下半年', 50]]);
+    const all = periods([], new Map(), S, Date.UTC(2026, 10, 1), 'all', { trips, idle: [] });
+    expect([all[0]!.earnings, all[0]!.trips, all[0]!.hourly]).toEqual([450, 3, 150]);
+  });
+});

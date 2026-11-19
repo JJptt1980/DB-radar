@@ -147,6 +147,8 @@ export interface Settings {
   memeEnabled: boolean;
   /** 已套用「龍珠梗預設改成 1 分鐘」的一次性升級 */
   memeV2?: boolean;
+  /** 隱藏統計分頁（金額比較敏感） */
+  statsHidden: boolean;
   /** 體感：手機傾斜時雷達跟著立體轉動（噱頭） */
   radarTilt: boolean;
 }
@@ -174,6 +176,7 @@ export const DEFAULT_SETTINGS: Settings = {
   radarRecordButton: true,
   memeIntervalSec: 60,
   memeEnabled: true,
+  statsHidden: false,
   radarTilt: true,
 };
 

@@ -3,7 +3,8 @@ import type { ComponentType } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { StatsIndex } from '../analytics/stats';
 import { slotLabel } from '../analytics/slots';
-import { bestCells, bestSlots, declineStats, monthly, weekly, type Period } from '../analytics/summary';
+import { bestCells, bestSlots, declineStats, monthly, periods, type Grain, type OfficialHistory, type Period } from '../analytics/summary';
+import type { Fare, Settings, TripEvent } from '../db/types';
 import { bearingDeg, compassLabel, distanceM } from '../domain/geo';
 import { lastFix } from '../sensors/gps';
 import { useAppState } from './store';
@@ -24,7 +25,6 @@ export function StatsPage() {
     return {
       slots: bestSlots(index, app.settings),
       cells: bestCells(index, app.settings),
-      weeks: weekly(app.events, fares ?? app.fares, app.settings, now, 8, official ?? undefined),
       month: monthly(app.events, fares ?? app.fares, app.settings, now, official ?? undefined)[0] ?? null,
       decline: declineStats(app.events),
     };
@@ -77,36 +77,13 @@ export function StatsPage() {
         {data.month ? <MonthCard p={data.month} /> : <p class="muted">這個月還沒有記錄。</p>}
       </section>
 
-      <section class="card">
-        <h2>每週時薪</h2>
-        {data.weeks.length === 0 ? (
-          <p class="muted">還沒有完整的班。</p>
-        ) : (
-          <table class="tbl">
-            <thead>
-              <tr>
-                <th>週（週一）</th>
-                <th>趟</th>
-                <th>實收</th>
-                <th>時薪</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.weeks.map((w) => (
-                <tr key={w.key}>
-                  <td>{w.key.slice(5)}</td>
-                  <td>{w.trips}</td>
-                  <td>
-                    {money(w.earnings)}
-                    {w.bonus > 0 && <div class="muted small">含獎 {money(w.bonus)}</div>}
-                  </td>
-                  <td>{w.hourly == null ? '—' : money(w.hourly)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      <IncomeCard
+        events={app.events}
+        fares={fares ?? app.fares}
+        official={official ?? undefined}
+        settings={app.settings}
+        now={now}
+      />
 
       <section class="card">
         <h2>最佳時段</h2>
@@ -234,4 +211,109 @@ function MapLoader(props: { index: StatsIndex }) {
   }, []);
   if (err) return <p class="muted">地圖載入失敗，請確認網路後重新整理。</p>;
   return Comp ? <Comp index={props.index} /> : <p class="muted">地圖載入中…</p>;
+}
+
+const GRAINS: [Grain, string][] = [
+  ['week', '週'],
+  ['month', '月'],
+  ['half', '半年'],
+  ['year', '年'],
+  ['all', '全部'],
+];
+const GRAIN_ROWS: Record<Grain, number> = { week: 12, month: 12, half: 10, year: 10, all: 1 };
+const GRAIN_KEY = 'dbradar-income-grain';
+
+function periodLabel(grain: Grain, key: string): string {
+  if (grain === 'week') return `${key.slice(5)} 週`;
+  if (grain === 'month') return `${key.slice(0, 4)}/${key.slice(5)}`;
+  return key;
+}
+
+/** 收入：上面是全部加總，下面依選的期間列出週薪／月薪／半年薪／年薪與時薪 */
+function IncomeCard(props: {
+  events: readonly TripEvent[];
+  fares: ReadonlyMap<string, Fare>;
+  official?: OfficialHistory;
+  settings: Settings;
+  now: number;
+}) {
+  const [grain, setGrain] = useState<Grain>(() => {
+    try {
+      const g = localStorage.getItem(GRAIN_KEY) as Grain | null;
+      return g && GRAINS.some(([k]) => k === g) ? g : 'week';
+    } catch {
+      return 'week';
+    }
+  });
+  const pick = (g: Grain) => {
+    setGrain(g);
+    try {
+      localStorage.setItem(GRAIN_KEY, g);
+    } catch {
+      // 記不住就算了
+    }
+  };
+  const { events, fares, official, settings, now } = props;
+  const total = useMemo(() => periods(events, fares, settings, now, 'all', official)[0] ?? null, [events, fares, official, settings]);
+  const rows = useMemo(
+    () => periods(events, fares, settings, now, grain, official).slice(0, GRAIN_ROWS[grain]),
+    [events, fares, official, settings, grain],
+  );
+  return (
+    <section class="card">
+      <h2>收入</h2>
+      {total && (
+        <div class="summary month">
+          <div>
+            <b>{money(total.earnings)}</b>
+            <span>總實收</span>
+          </div>
+          <div>
+            <b>{total.trips.toLocaleString('zh-TW')}</b>
+            <span>總趟數</span>
+          </div>
+          <div>
+            <b>{total.hourly == null ? '—' : money(total.hourly)}</b>
+            <span>平均時薪</span>
+          </div>
+        </div>
+      )}
+      <div class="chips grain-chips">
+        {GRAINS.map(([g, label]) => (
+          <button key={g} type="button" class={grain === g ? 'chip active' : 'chip'} onClick={() => pick(g)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {rows.length === 0 ? (
+        <p class="muted">還沒有資料。</p>
+      ) : (
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>期間</th>
+              <th>趟</th>
+              <th>實收</th>
+              <th>時數</th>
+              <th>時薪</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => (
+              <tr key={p.key}>
+                <td>{periodLabel(grain, p.key)}</td>
+                <td>{p.trips.toLocaleString('zh-TW')}</td>
+                <td>
+                  {money(p.earnings)}
+                  {p.bonus > 0 && <div class="muted small">含獎 {money(p.bonus)}</div>}
+                </td>
+                <td>{p.onlineHours.toFixed(0)}</td>
+                <td>{p.hourly == null ? '—' : money(p.hourly)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
 }

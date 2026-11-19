@@ -187,6 +187,14 @@ export function SettingsPage() {
       </section>
 
       <section class="card">
+        <h2>隱私</h2>
+        <label class="toggle">
+          <input type="checkbox" checked={app.settings.statsHidden} onChange={(e) => void setRadar({ statsHidden: e.currentTarget.checked })} />
+          <span>隱藏統計分頁（不想讓旁人看到收入金額時打開）</span>
+        </label>
+      </section>
+
+      <section class="card">
         <h2>記錄</h2>
         <label class="toggle">
           <input
