@@ -110,7 +110,9 @@ export function RadarPage() {
   const enough = tripCount >= MIN_TRIPS;
   // 雷達上畫出來的所有熱點（含所在這一格，只要有資料）都算龍珠
   const beepDots = useMemo(() => (enough && rec ? rec.candidates.filter((c) => hasEnoughData(c)) : []), [enough, rec]);
-  useNearBeep(beepDots, app.settings.radarSound);
+  // 載客中不出聲（乘客在車上）；前往接客時目標是乘客不是龍珠，也不嗶
+  const quiet = app.status.state === 'ontrip';
+  useNearBeep(beepDots, app.settings.radarSound && app.status.state === 'idle');
   const recordAction = allowedActions(app.status.state).find((a) => a in RECORD_TEXT);
 
   return (
@@ -130,7 +132,7 @@ export function RadarPage() {
         maxKm={app.settings.maxRadarKm}
         sweep={app.settings.radarSweep}
         corner={app.settings.radarCorner}
-        sound={app.settings.radarSound}
+        sound={app.settings.radarSound && !quiet}
         tilt={app.settings.radarTilt}
         onPick={(c, count) => setPicked({ c, count })}
       >
