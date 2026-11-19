@@ -104,13 +104,27 @@ export function RadarPage() {
   useWakeLock(true);
 
   const slot = slotOf(calc.at, new Set(app.settings.holidays));
-  // 這個時段（含相鄰時段）全城都沒有任何有資料的格子時，改用「不分時段」的熱點，雷達才不會一片空白
-  const { rec, allTime } = useMemo<{ rec: Recommendation | null; allTime: boolean }>(() => {
-    if (!index) return { rec: null, allTime: false };
+  // 這個時段全城都沒有任何有資料的格子時，往前後的時段找（12 點沒有就看 11～13 點，再沒有看 10～14 點…），
+  // 同一種日子（平日／週五…）找不到再放寬到所有日子，雷達才不會一片空白，也不會變成不分時段的大平均
+  const { rec, widened } = useMemo<{ rec: Recommendation | null; widened: string | null }>(() => {
+    if (!index) return { rec: null, widened: null };
+    const has = (r: Recommendation) => r.candidates.some((c) => !c.here) || r.far.length > 0 || hasEnoughData(r.here);
     const r = recommend(index, slot, calc.pos, app.settings);
-    if (r.candidates.some((c) => !c.here) || r.far.length > 0 || hasEnoughData(r.here)) return { rec: r, allTime: false };
-    const all = mergedView(index, DAY_TYPES.flatMap((d) => Array.from({ length: 24 }, (_, h) => `${d}:${h}` as Slot)), app.settings.importWeight);
-    return { rec: recommend(index, slot, calc.pos, app.settings, all), allTime: true };
+    if (has(r)) return { rec: r, widened: null };
+    const [day, hourStr] = slot.split(':') as [string, string];
+    const hour = Number(hourStr);
+    for (const days of [[day], DAY_TYPES as readonly string[]]) {
+      for (let k = 1; k <= 12; k++) {
+        const hours = Array.from({ length: 2 * k + 1 }, (_, i) => (hour - k + i + 24) % 24);
+        const view = mergedView(index, days.flatMap((d) => hours.map((h) => `${d}:${h}` as Slot)), app.settings.importWeight);
+        const w = recommend(index, slot, calc.pos, app.settings, view);
+        if (has(w)) {
+          const range = `${(hour - k + 24) % 24}～${(hour + k) % 24} 點`;
+          return { rec: w, widened: days.length > 1 ? `各種日子 ${range}` : range };
+        }
+      }
+    }
+    return { rec: r, widened: null };
   }, [index, slot, calc.pos, app.settings]);
   // 附近沒有熱點時，改畫範圍外最近的那些，雷達也放大到看得到它們
   const near = useMemo(() => (rec ? rec.candidates.filter((c) => !c.here).slice(0, MAX_DOTS) : []), [rec]);
@@ -145,7 +159,7 @@ export function RadarPage() {
       />
       {/* 時段、資料量等小字放在卡片下方，雷達下面整塊留給縮放鈕，雷達才能滿版 */}
       <p class="radar-foot">
-        {allTime ? `${slotLabel(slot)}沒資料・顯示全部時段` : slotLabel(slot)}・資料 {tripCount} 趟
+        {widened ? `${slotLabel(slot)}沒資料・改看 ${widened}` : slotLabel(slot)}・資料 {tripCount} 趟
         {rec && enough && `・信心度${CONF_LABEL[rec.best.confidence]}`}
         {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'held' ? '・車頭朝上（停車鎖定）' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
         {!calc.real && '・還沒有定位，先用預設中心'}
