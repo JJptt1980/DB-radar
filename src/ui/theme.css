@@ -380,7 +380,7 @@ body { overflow-x: hidden; }
 /* 雷達頁固定一個螢幕高、不捲動：卡片和小字照內容高，剩下的空間全部給雷達，底部留位置給縮放鈕 */
 .app.fit { height: 100dvh; overflow: hidden; }
 .app.fit .topbar { display: none; } /* 雷達頁不放大標題，空間留給雷達和按鈕 */
-.app.fit .page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: calc(env(safe-area-inset-top) + 14px); padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 128px); }
+.app.fit .page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: calc(env(safe-area-inset-top) + 14px); padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 180px); }
 .app.fit .radar-page { flex: 1; min-height: 0; }
 .radar-card { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
 .card-stack { display: flex; flex-direction: column; gap: 8px; }
@@ -493,11 +493,12 @@ body { overflow-x: hidden; }
 /* 角落：45° 斜斜伸向畫面中央，左右對稱；外殼大半在螢幕外 */
 .radar-zoom.zoom-bl,
 .radar-zoom.zoom-br {
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 44px);
+  /* 轉軸（元件底部中央）放在螢幕角落、分頁列上緣：距邊 8px、分頁列往上 6px */
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 6px);
   transform-origin: 50% 100%;
 }
-.radar-zoom.zoom-bl { left: -66px; transform: rotate(45deg); }
-.radar-zoom.zoom-br { right: -66px; transform: rotate(-45deg); }
+.radar-zoom.zoom-bl { left: -70px; transform: rotate(45deg); }
+.radar-zoom.zoom-br { right: -70px; transform: rotate(-45deg); }
 
 /* 正下方：不旋轉，從分頁列後面冒出圓盤和一點點柱子 */
 .radar-zoom.zoom-bc {
