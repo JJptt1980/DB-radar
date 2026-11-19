@@ -183,6 +183,8 @@ export interface Recommendation {
   best: Candidate;
   /** 原地分數與第一名差距 < 10% 時建議原地等候 */
   stay: boolean;
+  /** 雷達範圍（maxRadarKm）外、有資料的熱點，由近到遠 */
+  far: Candidate[];
   tripCount: number;
   enough: boolean;
 }
@@ -204,14 +206,17 @@ export function recommend(index: StatsIndex, slot: Slot, from: LatLon, settings:
   const hereCell = latLngToCell(from.lat, from.lon, index.res);
   const here = scoreCell(estimate(view, hereCell, settings), from, true, settings);
   const candidates: Candidate[] = [here];
+  const far: Candidate[] = [];
   for (const cell of view.cells.keys()) {
     if (cell === hereCell) continue;
     const est = estimate(view, cell, settings);
     if (!hasEnoughData(est)) continue;
     const c = scoreCell(est, from, false, settings);
-    if (c.straightKm > settings.maxRadarKm) continue;
-    candidates.push(c);
+    if (c.straightKm > settings.maxRadarKm) far.push(c);
+    else candidates.push(c);
   }
+  // 雷達範圍外的熱點：由近到遠，附近都沒資料時拿來指方向
+  far.sort((a, b) => a.straightKm - b.straightKm);
   candidates.sort((a, b) => b.score - a.score);
   // 原地沒有自己的資料時，它的分數只是全城平均，不能拿來建議「原地等候」
   const hereKnown = hasEnoughData(here);
@@ -223,6 +228,7 @@ export function recommend(index: StatsIndex, slot: Slot, from: LatLon, settings:
     here,
     best,
     stay: best.here || (hereKnown && here.score >= best.score * 0.9),
+    far: far.slice(0, 40),
     tripCount: index.tripCount,
     enough: index.tripCount >= MIN_TRIPS,
   };

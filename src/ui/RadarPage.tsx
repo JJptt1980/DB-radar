@@ -8,7 +8,7 @@ import { lastFix, onFix } from '../sensors/gps';
 import { useHeading } from '../sensors/heading';
 import { useWakeLock } from '../sensors/wakeLock';
 import { Dialog } from './Dialog';
-import { clampRange, clusterDots, clusterRadius, fitRange, nearBeep, nextZoom, niceStep, zoomStage, type Placed } from './radarZoom';
+import { clampRange, clusterDots, clusterRadius, fitRange, nearBeep, nextZoom, niceStep, radarMaxKm, zoomStage, type Placed } from './radarZoom';
 import { playNear, playZoom } from './radarSound';
 import { memeAt } from './memes';
 import { useTilt } from './useTilt';
@@ -107,7 +107,11 @@ export function RadarPage() {
     () => (index ? recommend(index, slot, calc.pos, app.settings) : null),
     [index, slot, calc.pos, app.settings],
   );
-  const dots = useMemo(() => (rec ? rec.candidates.filter((c) => !c.here).slice(0, MAX_DOTS) : []), [rec]);
+  // 附近沒有熱點時，改畫範圍外最近的那些，雷達也放大到看得到它們
+  const near = useMemo(() => (rec ? rec.candidates.filter((c) => !c.here).slice(0, MAX_DOTS) : []), [rec]);
+  const farOnly = !!rec && near.length === 0 && rec.far.length > 0;
+  const dots = farOnly ? rec!.far.slice(0, MAX_DOTS) : near;
+  const radarMax = rec ? radarMaxKm(app.settings.maxRadarKm, near.length, rec.far.map((c) => c.straightKm)) : app.settings.maxRadarKm;
   const tripCount = index?.tripCount ?? 0;
   const enough = tripCount >= MIN_TRIPS;
   // 雷達上畫出來的所有熱點（含所在這一格，只要有資料）都算龍珠
@@ -143,9 +147,9 @@ export function RadarPage() {
       </p>
       <RadarCanvas
         dots={enough ? dots : []}
-        best={enough && rec && !rec.stay ? rec.best : null}
+        best={enough && rec ? (farOnly ? rec.far[0]! : !rec.stay ? rec.best : null) : null}
         heading={heading.deg}
-        maxKm={app.settings.maxRadarKm}
+        maxKm={radarMax}
         sweep={app.settings.radarSweep}
         corner={app.settings.radarCorner}
         sound={soundLive}
@@ -346,6 +350,22 @@ function InfoCard(props: { rec: Recommendation | null; enough: boolean; heading:
     );
   }
   if (rec.best.here && !hasEnoughData(rec.here)) {
+    const f = rec.far[0];
+    if (f) {
+      // 附近沒資料：指出最近的熱點
+      const rot = f.bearing - (props.heading ?? 0);
+      return (
+        <section class="radar-card">
+          <div class="radar-main">
+            <span class="arrow" style={{ transform: `rotate(${rot}deg)` }} aria-hidden="true">
+              ↑
+            </span>
+            {compassLabel(f.bearing)} {f.straightKm.toFixed(1)} km
+          </div>
+          <div class="radar-sub">附近沒有資料，最近的熱點在這個方向</div>
+        </section>
+      );
+    }
     return (
       <section class="radar-card">
         <div class="radar-main">這附近還沒有資料</div>

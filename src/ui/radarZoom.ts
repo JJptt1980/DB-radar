@@ -70,6 +70,24 @@ export function nearBeep(
   return play;
 }
 
+/** 好讀的大範圍：15、20、25、30、40、50、60、80、100 公里，取不小於 km 的最小值 */
+export function niceRange(km: number): number {
+  for (const r of [15, 20, 25, 30, 40, 50, 60, 80, 100]) if (r >= km) return r;
+  return 100;
+}
+
+/**
+ * 雷達最大範圍：附近（maxKm 內）有熱點就用 maxKm；
+ * 都沒有的話放大到看得到最近幾個熱點（最近 3 個、或全部不到 3 個）的距離，例如 20、30 公里。
+ * 縮放鈕的三段就是這個最大範圍的 1、1/2、1/4，所以第一段一定看得到點。
+ */
+export function radarMaxKm(maxKm: number, nearCount: number, farKm: readonly number[]): number {
+  if (nearCount > 0 || farKm.length === 0) return maxKm;
+  const k = farKm[Math.min(2, farKm.length - 1)]!;
+  // 留 25% 邊，點才不會擠在雷達最外緣
+  return niceRange(k * 1.25);
+}
+
 export const clampRange = (km: number, maxKm: number): number => Math.min(maxKm, Math.max(MIN_RANGE_KM, km));
 
 /** 好讀的刻度：0.1、0.2、0.25、0.5、1、2、2.5、5… 取不小於 x 的最小值 */

@@ -125,3 +125,19 @@ describe('靠近龍珠嗶嗶', () => {
     expect(nearBeep(mem, at(450, 900))).toBe(1); // 回來再響
   });
 });
+
+import { niceRange, radarMaxKm } from '../src/ui/radarZoom';
+
+describe('附近沒有點時放大雷達', () => {
+  it('附近有點就維持原本範圍；沒有就放大到看得到最近 3 個點', () => {
+    expect(radarMaxKm(12, 3, [20, 25])).toBe(12);
+    expect(radarMaxKm(12, 0, [14, 18, 26, 40])).toBe(40); // 第 3 近 26 km × 1.25 → 40
+    expect(radarMaxKm(12, 0, [17])).toBe(25);
+    expect(radarMaxKm(12, 0, [])).toBe(12);
+    expect([niceRange(16), niceRange(44), niceRange(500)]).toEqual([20, 50, 100]);
+  });
+  it('放大後三段裡第一段看得到點', () => {
+    const max = radarMaxKm(12, 0, [14, 18, 26]);
+    expect(fitRange([14, 18, 26], 14, max)).toBe(max);
+  });
+});
