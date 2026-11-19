@@ -143,6 +143,8 @@ export interface Settings {
   radarRecordButton: boolean;
   /** 雷達資訊卡的龍珠梗多久換一句（秒）；0 = 不顯示 */
   memeIntervalSec: number;
+  /** 體感：手機傾斜時雷達跟著立體轉動（噱頭） */
+  radarTilt: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -167,6 +169,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
   radarRecordButton: true,
   memeIntervalSec: 30,
+  radarTilt: true,
 };
 
 /** Drive 備份狀態，存在 kv（不進備份檔） */

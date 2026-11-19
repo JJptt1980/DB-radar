@@ -66,3 +66,11 @@ describe('龍珠梗', () => {
     expect(seen.size).toBe(MEMES.idle.length);
   });
 });
+
+import { clampTilt } from '../src/ui/useTilt';
+
+describe('體感', () => {
+  it('轉動角度有上限', () => {
+    expect([clampTilt(30), clampTilt(-30), clampTilt(5)]).toEqual([14, -14, 5]);
+  });
+});

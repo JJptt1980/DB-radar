@@ -11,6 +11,7 @@ import { Dialog } from './Dialog';
 import { clampRange, clusterDots, clusterRadius, fitRange, nearBand, nextZoom, niceStep, zoomStage, type Placed } from './radarZoom';
 import { playNear, playZoom } from './radarSound';
 import { memeAt } from './memes';
+import { useTilt } from './useTilt';
 import type { DriverState } from '../domain/state';
 import { allowedActions } from '../domain/state';
 import type { EventType } from '../db/types';
@@ -132,6 +133,7 @@ export function RadarPage() {
         sweep={app.settings.radarSweep}
         corner={app.settings.radarCorner}
         sound={app.settings.radarSound}
+        tilt={app.settings.radarTilt}
         onPick={(c, count) => setPicked({ c, count })}
       >
         {app.settings.radarRecordButton && recordAction && (
@@ -398,10 +400,13 @@ function RadarCanvas(props: {
   sweep: boolean;
   corner: 'bl' | 'bc' | 'br';
   sound: boolean;
+  tilt: boolean;
   onPick: (c: Candidate, count: number) => void;
   children?: ComponentChildren;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useTilt(boxRef, props.tilt);
   const latest = useRef(props);
   latest.current = props;
   const placed = useRef<{ c: Candidate; count: number; x: number; y: number }[]>([]);
@@ -658,7 +663,7 @@ function RadarCanvas(props: {
 
   return (
     <div class="radar-wrap">
-      <div class="radar-box">
+      <div class="radar-box" ref={boxRef}>
         <canvas
           ref={ref}
           onClick={onClick}

@@ -213,6 +213,10 @@ export function SettingsPage() {
           <span>音效（縮放按鈕、靠近熱點時嗶嗶）</span>
         </label>
         <label class="toggle">
+          <input type="checkbox" checked={app.settings.radarTilt} onChange={(e) => void setRadar({ radarTilt: e.currentTarget.checked })} />
+          <span>體感：傾斜手機時雷達跟著立體轉動（純好玩）</span>
+        </label>
+        <label class="toggle">
           <input
             type="checkbox"
             checked={app.settings.radarRecordButton}
