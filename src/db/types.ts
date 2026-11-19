@@ -151,6 +151,11 @@ export interface Settings {
   statsHidden: boolean;
   /** 每月固定支出（車行費、保險、車貸、停車…），算淨收入用 */
   monthlyFixedCost: number;
+  /** 接單偏好：要長單、要短單（兩個都勾 = 都要） */
+  wantLong: boolean;
+  wantShort: boolean;
+  /** 長短單的分界：司機實收 ≥ 這個金額算長單 */
+  longFareMin: number;
   /** 體感：手機傾斜時雷達跟著立體轉動（噱頭） */
   radarTilt: boolean;
 }
@@ -180,6 +185,9 @@ export const DEFAULT_SETTINGS: Settings = {
   memeEnabled: true,
   statsHidden: false,
   monthlyFixedCost: 0,
+  wantLong: true,
+  wantShort: true,
+  longFareMin: 300,
   radarTilt: true,
 };
 

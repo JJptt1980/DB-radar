@@ -70,8 +70,22 @@ export function netFare(f: Fare, settings: Settings): number {
   return (f.fare ?? 0) + (f.tip ?? 0) + (settings.fareIncludesSurge ? 0 : (f.surge ?? 0));
 }
 
+/**
+ * 接單偏好（長單／短單）：回傳「這張單要不要算」。
+ * 不要的單，視為司機會拒掉繼續等：空車時間照算，但不算接到單，也不算進每單實收與耗時，
+ * 所以只要長單時，雷達會推薦「長單多、等得到長單」的地方。車資未知的單照算（無法分類）。
+ */
+export function orderFilter(settings: Settings): (fare: number | null | undefined) => boolean {
+  const long = settings.wantLong ?? true;
+  const short = settings.wantShort ?? true;
+  if (long === short) return () => true;
+  const min = settings.longFareMin ?? 300;
+  return (fare) => fare == null || (long ? fare >= min : fare < min);
+}
+
 export function buildStats(input: StatsInput): StatsIndex {
   const { settings } = input;
+  const wanted = orderFilter(settings);
   const res = settings.h3Res;
   const holidays = new Set(settings.holidays);
   const cells = new Map<Slot, CellMap<Acc>>();
@@ -172,9 +186,20 @@ export function buildStats(input: StatsInput): StatsIndex {
     const accept = seg.end;
     const ap = pos(accept);
     if (!ap) continue;
+    const approach = segByStart.get(accept.id);
+    // 先找出這張單的實收，用來判斷長短單
+    const dropEvt =
+      approach?.end?.type === 'pickup' ? segByStart.get(approach.end.id)?.end : null;
+    const dropFare = dropEvt?.type === 'dropoff' ? input.fares.get(dropEvt.id) : undefined;
+    const orderFare =
+      approach?.end?.type === 'cancel'
+        ? 0
+        : dropFare && !dropFare.deleted && !dropFare.pending && dropFare.fare != null
+          ? netFare(dropFare, settings)
+          : null;
+    if (!wanted(orderFare)) continue;
     const a = acc(slotOf(accept.ts, holidays), cellOf(ap.lat, ap.lon));
     a.orders++;
-    const approach = segByStart.get(accept.id);
     if (!approach?.end) continue;
     if (approach.end.type === 'cancel') {
       a.fareOrders++;
@@ -211,7 +236,9 @@ export function buildStats(input: StatsInput): StatsIndex {
     .sort((a, b) => reqOf(a)! - reqOf(b)!);
   for (let i = 0; i < vids.length; i++) {
     const t = vids[i]!;
-    if (t.fare != null && t.pickupLat != null && t.pickupLon != null && CELL_PRECISION.has(t.pickupPrecision ?? '')) {
+    const tFare = t.fare == null ? null : t.fare + (settings.fareIncludesSurge ? 0 : (t.surge ?? 0));
+    const tWanted = wanted(tFare);
+    if (tWanted && t.fare != null && t.pickupLat != null && t.pickupLon != null && CELL_PRECISION.has(t.pickupPrecision ?? '')) {
       const v = vacc(slotOf(reqOf(t)!, holidays), cellOf(t.pickupLat, t.pickupLon));
       v.sumFare += t.fare + (settings.fareIncludesSurge ? 0 : (t.surge ?? 0));
       v.fareOrders++;
@@ -224,7 +251,8 @@ export function buildStats(input: StatsInput): StatsIndex {
     if (prev.dropoffLat == null || prev.dropoffLon == null || !CELL_PRECISION.has(prev.dropoffPrecision ?? '')) continue;
     const v = vacc(slotOf(prevDrop, holidays), cellOf(prev.dropoffLat, prev.dropoffLon));
     v.idleHours += gapMin / 60;
-    v.orders++;
+    // 不要的單（例如只要長單時的短單）：空檔照算，但不算接到單
+    if (tWanted) v.orders++;
   }
 
   // ---------- Uber 官方資料（SPEC 4.6，2026-11-19 依真實檔案修訂） ----------
@@ -245,7 +273,9 @@ export function buildStats(input: StatsInput): StatsIndex {
     .filter((t) => t.source === 'uber_zip' && t.requestTs != null && !covered(t.requestTs, t.requestTs + 1))
     .sort((a, b) => a.requestTs! - b.requestTs!);
   // 每一單的實收與耗時（接單到下客）：放進全城層，當作 V、D 的先驗
+  const tripFare = (t: ImportedTrip | null) => (t?.fare == null ? null : t.fare + (settings.fareIncludesSurge ? 0 : (t.surge ?? 0)));
   for (const t of officialTrips) {
+    if (!wanted(tripFare(t))) continue;
     const a = oacc(slotOf(t.requestTs!, holidays));
     if (t.fare != null) {
       a.sumNetFare += t.fare + (settings.fareIncludesSurge ? 0 : (t.surge ?? 0));
@@ -276,7 +306,7 @@ export function buildStats(input: StatsInput): StatsIndex {
     if (!path.length) {
       // 沒有地點：只進全城層，回答「哪個時段好」
       addTime(null, p.start, p.end);
-      if (p.endedWithOrder) oacc(slotOf(p.end, holidays)).orders++;
+      if (p.endedWithOrder && wanted(tripFare(tripAt(p.end)))) oacc(slotOf(p.end, holidays)).orders++;
       continue;
     }
     // 有 GPS 軌跡（最近 30 天）：和自己的記錄一樣算進格子，權重 1
@@ -285,10 +315,11 @@ export function buildStats(input: StatsInput): StatsIndex {
     if (nodes[nodes.length - 1]!.ts < p.end) nodes.push({ ts: p.end, cell: nodes[nodes.length - 1]!.cell });
     addPath(nodes);
     if (!p.endedWithOrder) continue;
-    const a = acc(slotOf(p.end, holidays), nodes[nodes.length - 1]!.cell);
-    a.orders++;
     locatedOrders++;
     const t = tripAt(p.end);
+    if (!wanted(tripFare(t))) continue;
+    const a = acc(slotOf(p.end, holidays), nodes[nodes.length - 1]!.cell);
+    a.orders++;
     if (t?.fare != null) {
       a.sumNetFare += t.fare + (settings.fareIncludesSurge ? 0 : (t.surge ?? 0));
       a.fareOrders++;

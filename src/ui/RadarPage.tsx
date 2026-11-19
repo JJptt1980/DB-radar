@@ -160,6 +160,8 @@ export function RadarPage() {
       {/* 時段、資料量等小字放在卡片下方，雷達下面整塊留給縮放鈕，雷達才能滿版 */}
       <p class="radar-foot">
         {widened ? `${slotLabel(slot)}沒資料・改看 ${widened}` : slotLabel(slot)}・資料 {tripCount} 趟
+        {app.settings.wantLong !== app.settings.wantShort &&
+          (app.settings.wantLong ? `・只看長單 ${money(app.settings.longFareMin)}+` : '・只看短單')}
         {rec && enough && `・信心度${CONF_LABEL[rec.best.confidence]}`}
         {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'held' ? '・車頭朝上（停車鎖定）' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
         {!calc.real && '・還沒有定位，先用預設中心'}

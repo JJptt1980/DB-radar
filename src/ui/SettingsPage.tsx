@@ -13,6 +13,7 @@ import { isStandalone, notificationPermission } from '../sensors/storage';
 import { getState, loadAll, retryPersist, useAppState } from './store';
 
 const getPersist = () => getState().persist;
+const money = (n: number) => '$' + n.toLocaleString('zh-TW');
 
 const PERSIST_TEXT = {
   granted: '已開啟：瀏覽器不會自動清除資料',
@@ -192,6 +193,47 @@ export function SettingsPage() {
           <input type="checkbox" checked={app.settings.statsHidden} onChange={(e) => void setRadar({ statsHidden: e.currentTarget.checked })} />
           <span>隱藏統計分頁（不想讓旁人看到收入金額時打開）</span>
         </label>
+      </section>
+
+      <section class="card">
+        <h2>接單偏好</h2>
+        <p class="muted small">雷達、熱力地圖、最佳時段只算你想要的單。不要的單當作會拒掉、繼續等。</p>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={app.settings.wantLong}
+            onChange={(e) => {
+              const on = e.currentTarget.checked;
+              // 至少留一個：取消最後一個時另一個自動勾上
+              void setRadar(on || app.settings.wantShort ? { wantLong: on } : { wantLong: false, wantShort: true });
+            }}
+          />
+          <span>長單（實收 {money(app.settings.longFareMin)} 以上）</span>
+        </label>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={app.settings.wantShort}
+            onChange={(e) => {
+              const on = e.currentTarget.checked;
+              void setRadar(on || app.settings.wantLong ? { wantShort: on } : { wantShort: false, wantLong: true });
+            }}
+          />
+          <span>短單（實收不到 {money(app.settings.longFareMin)}）</span>
+        </label>
+        <p class="muted small">長短單的分界</p>
+        <div class="chips">
+          {[200, 300, 400, 500].map((k) => (
+            <button
+              key={k}
+              type="button"
+              class={app.settings.longFareMin === k ? 'chip active' : 'chip'}
+              onClick={() => void setRadar({ longFareMin: k })}
+            >
+              {money(k)}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section class="card">

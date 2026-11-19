@@ -374,3 +374,40 @@ describe('淨收入', () => {
     expect(periodMonths('month', '2026-12', now, 0)).toBe(0);
   });
 });
+
+import { orderFilter } from '../src/analytics/stats';
+
+describe('長單／短單偏好', () => {
+  it('分界預設 300，兩個都勾或都不勾就是全部', () => {
+    const f = (wantLong: boolean, wantShort: boolean) => orderFilter({ ...S, wantLong, wantShort, longFareMin: 300 });
+    expect([f(true, false)(300), f(true, false)(299), f(true, false)(null)]).toEqual([true, false, true]);
+    expect([f(false, true)(299), f(false, true)(300)]).toEqual([true, false]);
+    expect([f(true, true)(10), f(false, false)(10)]).toEqual([true, true]);
+  });
+  it('只要長單時，短單不算接到單，但空車時間照算', () => {
+    const t0 = Date.UTC(2026, 2, 2, 1, 0);
+    const trip = (id: string, ts: number, fare: number): ImportedTrip => ({
+      id, source: 'uber_zip', externalId: null, dedupeKey: id, requestTs: ts, pickupTs: ts + 300_000, dropoffTs: ts + 1_200_000,
+      durationSec: 900, distanceKm: 5, pickupLat: null, pickupLon: null, dropoffLat: null, dropoffLon: null,
+      pickupAddress: null, dropoffAddress: null, pickupPrecision: null, dropoffPrecision: null,
+      fare, surge: 0, product: null, matchedDropoffEventId: null, raw: {}, updatedAt: 0,
+    });
+    const idle = (id: string, start: number, end: number): ImportedIdle => ({
+      id, source: 'uber_zip', start, end, endedWithOrder: true, path: [[start, 25, 121.5], [end, 25, 121.5]], updatedAt: 0,
+    });
+    const H = 3_600_000;
+    const input = {
+      events: [], fares: new Map(), tracks: [],
+      imported: [trip('a', t0, 150), trip('b', t0 + H, 450)],
+      idle: [idle('i1', t0 - 600_000, t0), idle('i2', t0 + H - 600_000, t0 + H)],
+    };
+    const sum = (idx: ReturnType<typeof buildStats>) => {
+      let orders = 0, hours = 0;
+      for (const m of idx.cells.values()) for (const a of m.values()) { orders += a.orders; hours += a.idleHours; }
+      return [orders, Math.round(hours * 60)];
+    };
+    expect(sum(buildStats({ ...input, settings: { ...S, wantLong: true, wantShort: true } }))).toEqual([2, 20]);
+    expect(sum(buildStats({ ...input, settings: { ...S, wantLong: true, wantShort: false } }))).toEqual([1, 20]);
+    expect(sum(buildStats({ ...input, settings: { ...S, wantLong: false, wantShort: true } }))).toEqual([1, 20]);
+  });
+});

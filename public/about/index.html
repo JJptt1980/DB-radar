@@ -132,6 +132,18 @@
   .feature li { margin: 4px 0; }
   .demo { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; min-height: 240px; display: grid; place-items: center; overflow: hidden; }
 
+
+  /* 長短單 */
+  .pref { width: 100%; max-width: 320px; display: grid; gap: 10px; }
+  .pref-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--card); font-weight: 700; }
+  .box { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font-size: 15px; font-weight: 900; color: transparent; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25); transition: background 0.25s, color 0.25s, box-shadow 0.25s; }
+  .box.on { background: var(--amber); color: #241300; box-shadow: none; }
+  .pref-result { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .pref-result div { background: var(--card-2); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; }
+  .pref-result b { font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .pref-result span { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .pref-note { font-size: 13px; color: var(--muted); text-align: center; min-height: 2.8em; }
+
   /* 一鍵記錄 */
   .ritual { width: 170px; height: 170px; border-radius: 50%; display: grid; place-items: center; font-size: 34px; font-weight: 900; letter-spacing: 0.08em; color: #04170b; background: var(--green); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.05), 0 20px 50px rgba(0, 0, 0, 0.4); transition: background 0.3s, color 0.3s; position: relative; }
   .ritual::after { content: ''; position: absolute; inset: -10px; border-radius: 50%; border: 3px solid currentColor; opacity: 0; }
@@ -283,7 +295,7 @@
         </div>
         <div class="card step">
           <h3>分析你的時段與地點</h3>
-          <p>看你在哪個時段、哪一區等多久、一單賺多少，扣掉開過去的時間和成本。</p>
+          <p>看你在哪個時段、哪一區等多久、一單賺多少；長單派、短單派各算各的，還扣掉開過去的時間和成本。</p>
         </div>
         <div class="card step">
           <h3>雷達指方向</h3>
@@ -301,6 +313,29 @@
 
       <div class="feature">
         <div>
+          <h3>長單派？短單派？你決定</h3>
+          <p class="lead">有人喜歡一趟跑久一點，有人喜歡短單快速輪轉。勾選你要的單，雷達、熱力地圖和最佳時段就只幫你算那一種，不要的單當作會拒掉、繼續等。</p>
+          <ul>
+            <li>長單、短單用實收金額分，預設 $300，可改 $200～$500</li>
+            <li>兩個都勾就是都要</li>
+            <li>只要長單時，雷達會指向「等得到長單」的地方，而不只是單多的地方</li>
+          </ul>
+        </div>
+        <div class="demo">
+          <div class="pref" id="pref">
+            <div class="pref-row"><span class="box on" id="prefLong">✓</span><span>長單（$300 以上）</span></div>
+            <div class="pref-row"><span class="box" id="prefShort">✓</span><span>短單（$300 以下）</span></div>
+            <div class="pref-result" id="prefResult">
+              <div><b id="prefWait">13 分</b><span>平均等待</span></div>
+              <div><b id="prefPer">$520</b><span>每單實收</span></div>
+            </div>
+            <div class="pref-note" id="prefNote">只看長單：等久一點，但一單賺比較多（示範數字）</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature flip">
+        <div>
           <h3>一顆大按鈕，就是記錄</h3>
           <p class="lead">上線 → 接單 → 上客 → 下客，按同一個位置就好。按下去會震一下，車資可以之後再補，或匯入官方資料時自動對上。</p>
         </div>
@@ -312,7 +347,7 @@
         </div>
       </div>
 
-      <div class="feature flip">
+      <div class="feature">
         <div>
           <h3>匯入 Uber 官方資料</h3>
           <p class="lead">在 Uber App 申請「下載你的資料」，把收到的 zip 選進來。</p>
@@ -333,7 +368,7 @@
         </div>
       </div>
 
-      <div class="feature">
+      <div class="feature flip">
         <div>
           <h3>收入，算清楚</h3>
           <p class="lead">週、月、半年、年，一鍵切換。還能切到「淨收入」：扣掉每公里油錢保養、過路費、車行費和保險，看看真正放進口袋的時薪。</p>
@@ -349,7 +384,7 @@
         </div>
       </div>
 
-      <div class="feature flip">
+      <div class="feature">
         <div>
           <h3>熱力地圖</h3>
           <p class="lead">把城市切成六角形格子，依時段上色。紅色是過去這個時段最值得等的地方，拖拉小時就看得到熱點怎麼移動。</p>
@@ -362,7 +397,7 @@
         </div>
       </div>
 
-      <div class="feature">
+      <div class="feature flip">
         <div>
           <h3>等單的時候，有人陪你</h3>
           <p class="lead">雷達上會輪播一句打氣的話，一整天不重複；載客時就安靜地叫你安心開。靠近熱點時，雷達會嗶嗶提醒你（載客時自動靜音）。</p>
@@ -700,6 +735,25 @@
     sMeme.style.opacity = 0;
     setTimeout(() => { sMeme.textContent = lines[li]; sMeme.style.opacity = 1; }, 300);
   }, 4000);
+
+
+  // 長短單（示範數字，取自「等待／每單」的相對差異）
+  const prefModes = [
+    { long: true, short: false, wait: '13 分', per: '$520', note: '只看長單：等久一點，但一單賺比較多（示範數字）' },
+    { long: false, short: true, wait: '6 分', per: '$150', note: '只看短單：一單少一點，但很快接到下一單（示範數字）' },
+    { long: true, short: true, wait: '5 分', per: '$240', note: '都要：等最短，每單平均（示範數字）' },
+  ];
+  let pi = 0;
+  const setPref = () => {
+    const m = prefModes[pi];
+    document.getElementById('prefLong').classList.toggle('on', m.long);
+    document.getElementById('prefShort').classList.toggle('on', m.short);
+    document.getElementById('prefWait').textContent = m.wait;
+    document.getElementById('prefPer').textContent = m.per;
+    document.getElementById('prefNote').textContent = m.note;
+  };
+  setPref();
+  setInterval(() => { pi = (pi + 1) % prefModes.length; setPref(); }, 2600);
 
   // 一鍵記錄
   const states = [

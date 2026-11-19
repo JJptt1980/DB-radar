@@ -27,7 +27,7 @@ export function useAnalytics(): {
       const [tracks, imported, idle, bonus] = await Promise.all([countTrackPoints(), getAllImportedTrips(), getAllImportedIdle(), getAllImportedBonus()]);
       const s = app.settings;
       const key = [app.events.length, lastUpdate, app.fares.size, fareUpdate, tracks, imported.length, imported.reduce((m, t) => Math.max(m, t.updatedAt), 0), idle.length, bonus.length,
-        s.h3Res, s.holidays.join(), s.fareIncludesSurge, s.gapBreakMin, s.importWeight].join('|');
+        s.h3Res, s.holidays.join(), s.fareIncludesSurge, s.gapBreakMin, s.importWeight, s.wantLong, s.wantShort, s.longFareMin].join('|');
       if (cache?.key === key) return force((n) => n + 1);
       setLoading(true);
       const all = await getAllTracks();
