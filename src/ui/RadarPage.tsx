@@ -84,7 +84,7 @@ export function RadarPage() {
       <p class="radar-foot">
         {slotLabel(slot)}・資料 {tripCount} 趟
         {rec && enough && `・信心度${CONF_LABEL[rec.best.confidence]}`}
-        {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
+        {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'held' ? '・車頭朝上（停車鎖定）' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
         {!calc.real && '・還沒有定位，先用預設中心'}
       </p>
 

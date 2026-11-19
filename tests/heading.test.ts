@@ -22,3 +22,39 @@ describe('方向', () => {
     expect(compassLabel(225)).toBe('西南');
   });
 });
+
+import { angleDiff, nextHold } from '../src/sensors/heading';
+
+describe('停車鎖定車頭方向', () => {
+  const base = { lat: 25.0, lon: 121.5 }; // 虛構座標
+  const north = (m: number) => ({ lat: base.lat + m / 111_195, lon: base.lon });
+  const east = (m: number) => ({ lat: base.lat, lon: base.lon + m / (111_195 * Math.cos((25 * Math.PI) / 180)) });
+
+  it('開車時用 GPS 方向，停下後原地漂移不改方向', () => {
+    let h = nextHold(null, { ...base, speed: 10, heading: 90, accuracy: 5 });
+    expect(h!.deg).toBe(90);
+    // 停車，位置在 20 公尺內亂飄、GPS heading 亂跳
+    for (const p of [north(12), east(-15), north(-8)]) h = nextHold(h, { ...p, speed: 0.3, heading: 200, accuracy: 10 });
+    expect(h!.deg).toBe(90);
+  });
+
+  it('定位誤差大時漂移門檻跟著放大', () => {
+    const h = nextHold({ deg: 90, ...base }, { ...north(45), speed: 0.5, heading: null, accuracy: 30 });
+    expect(h!.deg).toBe(90);
+  });
+
+  it('慢慢開動（例如轉進巷子）時用位移方向', () => {
+    const h = nextHold({ deg: 90, ...base }, { ...north(50), speed: 2, heading: null, accuracy: 5 });
+    expect(angleDiff(h!.deg, 45)).toBeLessThan(1); // 東（90）和北（0）各半
+    expect(h!.lat).toBeCloseTo(north(50).lat);
+  });
+
+  it('一次跳太遠（App 從背景回來）就放棄鎖定；沒開過車也不亂猜', () => {
+    expect(nextHold({ deg: 90, ...base }, { ...north(500), speed: 0, heading: null, accuracy: 5 })).toBeNull();
+    expect(nextHold(null, { ...base, speed: 0, heading: 120, accuracy: 5 })).toBeNull();
+  });
+
+  it('angleDiff 跨過 0 度', () => {
+    expect(angleDiff(350, 10)).toBe(20);
+  });
+});
