@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { EventType, ImportedTrip, TripEvent } from '../db/types';
-import { avgRecentFare, withOfficialFares } from '../analytics/officialFares';
+import { avgRecentFare, estimateUnpriced, fitFareModel, withOfficialFares } from '../analytics/officialFares';
 import { getAllImportedTrips } from '../db/db';
 import { EVENT_LABEL, STATE_LABEL, allowedActions, liveEvents, shiftSummary } from '../domain/state';
 import { fmtDuration, fmtTime, startOfTaipeiDay } from '../domain/time';
@@ -92,12 +92,14 @@ export function RecordPage() {
   }, [app.events.length]);
   const fares = useMemo(() => withOfficialFares(app.events, app.fares, official), [app.events, app.fares, official]);
   const avgFare = useMemo(() => avgRecentFare(official, Date.now()), [official]);
+  const fareModel = useMemo(() => fitFareModel(official, Date.now()), [official]);
   const summary = shiftId ? shiftSummary(app.events, fares, shiftId, now) : null;
   const estimated = summary && summary.unpriced > 0;
-  const earningsShown = summary ? summary.earnings + (summary.unpriced ? summary.unpriced * (avgFare ?? 0) : 0) : 0;
+  // 沒有車資的趟：用這趟上客到下客的分鐘數估（官方資料擬合），沒有載客時間才用平均
+  const unpricedEst = summary && shiftId && summary.unpriced ? estimateUnpriced(app.events, fares, shiftId, fareModel, avgFare) : 0;
+  const earningsShown = summary ? summary.earnings + (unpricedEst ?? 0) : 0;
   const hours = summary ? summary.onlineMs / 3_600_000 : 0;
-  const hourlyShown =
-    summary && hours >= 0.05 && (!summary.unpriced || avgFare != null) ? earningsShown / hours : null;
+  const hourlyShown = summary && hours >= 0.05 && unpricedEst != null ? earningsShown / hours : null;
 
   const live = useMemo(() => liveEvents(app.events), [app.events]);
   const today = useMemo(() => {
@@ -155,7 +157,7 @@ export function RecordPage() {
               <span>趟</span>
             </div>
             <div>
-              <b>{summary.unpriced && avgFare == null ? '—' : money(earningsShown)}</b>
+              <b>{unpricedEst == null ? '—' : money(earningsShown)}</b>
               <span>{estimated ? '實收（估）' : '實收'}</span>
             </div>
             <div>

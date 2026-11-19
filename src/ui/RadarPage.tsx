@@ -113,7 +113,7 @@ export function RadarPage() {
   const recordAction = allowedActions(app.status.state).find((a) => a in RECORD_TEXT);
 
   return (
-    <div class="radar-page">
+    <div class="radar-page with-zoom">
       <TopCard rec={rec} enough={enough} heading={heading.deg} loading={loading || !index} />
       <RadarCanvas
         dots={enough ? dots : []}
@@ -529,7 +529,7 @@ function RadarCanvas(props: {
 
   return (
     <div class="radar-wrap">
-      <div class={`radar-box zoom-${props.corner}`}>
+      <div class="radar-box">
         <canvas
           ref={ref}
           onClick={onClick}
@@ -539,17 +539,19 @@ function RadarCanvas(props: {
           onPointerCancel={onPointerUp}
           aria-label="熱點雷達"
         />
-        <button
-          key={pressed}
-          type="button"
-          class={`radar-zoom corner-${props.corner}${pressed ? ' pressed' : ''}`}
-          onClick={onZoomButton}
-          aria-label="切換雷達範圍"
-        >
-          <span class="cap" />
-        </button>
         {props.children}
       </div>
+      {/* 縮放鈕固定在畫面最下方，從分頁列後面冒出來 */}
+      <button
+        key={pressed}
+        type="button"
+        class={`radar-zoom zoom-${props.corner}${pressed ? ' pressed' : ''}`}
+        onClick={onZoomButton}
+        aria-label="切換雷達範圍"
+      >
+        <span class="body" />
+        <span class="cap" />
+      </button>
     </div>
   );
 }

@@ -61,3 +61,22 @@ describe('記錄頁的估計', () => {
     expect([s.trips, s.earnings, s.unpriced]).toEqual([2, 150, 1]);
   });
 });
+
+import { estimateUnpriced, fitFareModel } from '../src/analytics/officialFares';
+
+describe('依載客時間估車資', () => {
+  const mk = (i: number, min: number, fare: number): ImportedTrip => ({
+    ...trip(`m${i}`, T0 + i * 3_600_000, fare), durationSec: min * 60, requestTs: T0 + i * 3_600_000,
+  });
+  it('擬合出每分鐘多少錢，短程估得少、長程估得多', () => {
+    const data = Array.from({ length: 40 }, (_, i) => mk(i, 5 + (i % 20), 50 + 12 * (5 + (i % 20))));
+    const m = fitFareModel(data, T0 + 50 * 3_600_000)!;
+    expect(m.b).toBeCloseTo(12);
+    expect(m.a).toBeCloseTo(50);
+    const pick = (id: string, ts: number): TripEvent => ({ ...ev(id, ts), type: 'pickup' });
+    const events = [pick('p1', T0), ev('d1', T0 + 5 * 60_000), pick('p2', T0 + 10 * 60_000), ev('d2', T0 + 40 * 60_000)];
+    expect(estimateUnpriced(events, new Map(), 's', m, 200)).toBeCloseTo(110 + 410);
+    expect(fitFareModel(data.slice(0, 5), T0)).toBeNull();
+    expect(estimateUnpriced([ev('x', T0)], new Map(), 's', null, 200)).toBe(200);
+  });
+});

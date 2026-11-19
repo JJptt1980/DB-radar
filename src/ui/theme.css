@@ -214,7 +214,7 @@ body {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 10;
+  z-index: 2000;
   background: var(--backdrop);
   display: flex;
   align-items: flex-end;
@@ -387,74 +387,96 @@ body {
 .radar-sub { font-size: 20px; color: var(--accent); margin-top: 6px; }
 .arrow { display: inline-block; font-size: 40px; color: var(--accent); transition: transform 0.4s ease; }
 .radar-wrap { display: flex; justify-content: center; }
-.radar-box { position: relative; --s: 340px; }
-.radar-box.zoom-bc { padding-bottom: 34px; }
+.radar-box { position: relative; }
 .radar-wrap canvas { position: relative; z-index: 1; display: block; touch-action: none; }
+/* 縮放鈕佔住畫面最下方，內容留空間給它 */
+.radar-page.with-zoom { padding-bottom: 150px; }
+body { overflow-x: hidden; }
 
 /*
- * 縮放按鈕藏在雷達外框後面，只冒出一部分：
- * - 左下、右下：從側面看的圓柱（白色頂面＋灰色側面），沿著對角線往外伸
- * - 正下方：從正上方俯瞰的圓鈕，被雷達下緣擋住一半，看到的是半圓
+ * 縮放鈕：固定在畫面最下方，下半截藏在分頁列後面，只冒出上半截。
+ * - 左下、右下：從側面看的大圓柱，從角落斜斜伸出來，白色頂面＋灰色側面
+ * - 正下方：從斜上方俯瞰，灰色大底座上一顆白色圓鈕
+ * 按下去沿著軸往下沉一下。
  */
 .radar-zoom {
-  position: absolute;
-  z-index: 0;
+  position: fixed;
+  z-index: 900; /* 在分頁列（1000）後面 */
   padding: 0;
   border: 0;
+  background: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.08s ease-out, filter 0.08s;
 }
-.radar-zoom.corner-bl,
-.radar-zoom.corner-br {
-  width: 66px;
-  height: 62px;
-  border-radius: 33px / 14px;
-  background: linear-gradient(90deg, #8f969b 0%, #d9dde0 30%, #f4f6f7 48%, #c3c8cc 72%, #7d8489 100%);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
-  /* 圓柱中心在對角線上、雷達半徑外一點點 */
-  top: calc(var(--s) * 0.8536 + 9px - 31px);
+.radar-zoom .body,
+.radar-zoom .cap { position: absolute; left: 0; right: 0; display: block; }
+.radar-zoom .body {
+  top: 22%;
+  bottom: 0;
+  background: linear-gradient(90deg, #5f666b 0%, #a9afb3 20%, #d9dddf 42%, #b6bcc0 64%, #6c7378 100%);
+  border-radius: 0 0 50% 50% / 0 0 18% 18%;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.45);
 }
-.radar-zoom.corner-bl { left: calc(var(--s) * 0.1464 - 9px - 33px); transform: rotate(225deg); }
-.radar-zoom.corner-br { left: calc(var(--s) * 0.8536 + 9px - 33px); transform: rotate(135deg); }
-.radar-zoom.corner-bl .cap,
-.radar-zoom.corner-br .cap {
-  position: absolute;
-  left: 0;
-  right: 0;
+.radar-zoom .cap {
   top: 0;
-  height: 28px;
+  height: 44%;
   border-radius: 50%;
-  background: radial-gradient(ellipse at 40% 35%, #ffffff 0%, #f3f5f6 55%, #cfd4d7 100%);
-  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.18);
-}
-.radar-zoom.corner-bl:active { transform: rotate(225deg) translateY(7px); filter: brightness(0.93); }
-.radar-zoom.corner-br:active { transform: rotate(135deg) translateY(7px); filter: brightness(0.93); }
-.radar-zoom.corner-bl.pressed { animation: zoom-push-bl 0.2s ease-out; }
-.radar-zoom.corner-br.pressed { animation: zoom-push-br 0.2s ease-out; }
-@keyframes zoom-push-bl { 0% { transform: rotate(225deg) translateY(7px); } 100% { transform: rotate(225deg); } }
-@keyframes zoom-push-br { 0% { transform: rotate(135deg) translateY(7px); } 100% { transform: rotate(135deg); } }
-
-.radar-zoom.corner-bc {
-  width: 84px;
-  height: 84px;
-  border-radius: 50%;
-  left: calc(var(--s) / 2 - 42px);
-  top: calc(var(--s) - 6px - 42px);
-  background: radial-gradient(circle, #aab0b4 0%, #8a9196 62%, #5f666b 100%);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
-}
-.radar-zoom.corner-bc .cap {
-  position: absolute;
-  inset: 8px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 70%, #ffffff 0%, #f2f4f5 45%, #d2d6d9 85%, #b9bec2 100%);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  background: radial-gradient(ellipse at 42% 38%, #ffffff 0%, #f6f7f8 45%, #dfe3e5 80%, #c4c9cc 100%);
+  border: 2px solid #aeb4b8;
+  box-sizing: border-box;
+  box-shadow: inset 0 -5px 10px rgba(0, 0, 0, 0.15);
   transition: transform 0.08s ease-out;
 }
-.radar-zoom.corner-bc:active .cap { transform: scale(0.92); filter: brightness(0.93); }
-.radar-zoom.corner-bc.pressed .cap { animation: zoom-push-bc 0.2s ease-out; }
-@keyframes zoom-push-bc { 0% { transform: scale(0.92); } 100% { transform: none; } }
+
+/* 側面看的圓柱：寬 150、高 190，從角落往畫面中央斜伸 */
+.radar-zoom.zoom-bl,
+.radar-zoom.zoom-br {
+  width: 150px;
+  height: 190px;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 70px);
+  transform-origin: 50% 100%;
+}
+.radar-zoom.zoom-bl { left: -14px; --tilt: 28deg; }
+.radar-zoom.zoom-br { right: -14px; --tilt: -28deg; }
+.radar-zoom.zoom-bl,
+.radar-zoom.zoom-br { transform: rotate(var(--tilt)); }
+.radar-zoom.zoom-bl:active,
+.radar-zoom.zoom-br:active { transform: rotate(var(--tilt)) translateY(12px); }
+.radar-zoom.zoom-bl.pressed,
+.radar-zoom.zoom-br.pressed { animation: zoom-push-side 0.22s ease-out; }
+@keyframes zoom-push-side {
+  0% { transform: rotate(var(--tilt)) translateY(12px); }
+  100% { transform: rotate(var(--tilt)); }
+}
+
+/* 正下方：灰色大底座（半圓）上一顆白色圓鈕，從斜上方看 */
+.radar-zoom.zoom-bc {
+  left: 50%;
+  width: min(62vw, 260px);
+  height: 170px;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 70px);
+  transform: translateX(-50%);
+}
+.radar-zoom.zoom-bc::before {
+  content: '';
+  position: absolute;
+  left: -26%;
+  right: -26%;
+  top: 22%;
+  bottom: -40%;
+  border-radius: 50% 50% 0 0 / 55% 55% 0 0;
+  background: radial-gradient(ellipse at 50% 0%, #9aa1a5 0%, #737a7f 45%, #4f565b 100%);
+  border-top: 2px solid #b3b9bd;
+  box-shadow: 0 -2px 18px rgba(0, 0, 0, 0.45);
+}
+.radar-zoom.zoom-bc .body { top: 20%; bottom: 18%; }
+.radar-zoom.zoom-bc .cap { height: 46%; }
+.radar-zoom.zoom-bc:active .cap,
+.radar-zoom.zoom-bc:active .body { transform: translateY(10px); }
+.radar-zoom.zoom-bc.pressed .cap,
+.radar-zoom.zoom-bc.pressed .body { animation: zoom-push-bc 0.22s ease-out; }
+@keyframes zoom-push-bc { 0% { transform: translateY(10px); } 100% { transform: none; } }
+.radar-zoom.zoom-bc .body { transition: transform 0.08s ease-out; }
 
 /* 記錄按鈕：小小的，放在雷達左上角，不搶畫面 */
 .radar-record {
