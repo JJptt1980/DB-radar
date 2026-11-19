@@ -111,6 +111,11 @@ export async function getSettings(): Promise<Settings> {
     out.memeIntervalSec = 30;
   }
   if (![30, 60, 120, 300, 600].includes(out.memeIntervalSec)) out.memeIntervalSec = out.memeIntervalSec < 30 ? 30 : 120;
+  // 2026-11-19：片段加量後預設改成 1 分鐘一句；舊的預設 30 秒一次性換成 1 分鐘（之後使用者自己選 30 秒會保留）
+  if (!out.memeV2) {
+    if (out.memeIntervalSec === 30) out.memeIntervalSec = 60;
+    out.memeV2 = true;
+  }
   return out;
 }
 

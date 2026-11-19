@@ -145,6 +145,8 @@ export interface Settings {
   memeIntervalSec: number;
   /** 顯示龍珠梗 */
   memeEnabled: boolean;
+  /** 已套用「龍珠梗預設改成 1 分鐘」的一次性升級 */
+  memeV2?: boolean;
   /** 體感：手機傾斜時雷達跟著立體轉動（噱頭） */
   radarTilt: boolean;
 }
@@ -170,7 +172,7 @@ export const DEFAULT_SETTINGS: Settings = {
   radarSound: true,
   theme: 'dark',
   radarRecordButton: true,
-  memeIntervalSec: 30,
+  memeIntervalSec: 60,
   memeEnabled: true,
   radarTilt: true,
 };

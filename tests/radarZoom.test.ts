@@ -76,6 +76,20 @@ describe('龍珠梗', () => {
     const b = memeByIndex('ontrip', 101).split(/[，。]/);
     expect(a.filter((x, i) => x === b[i] && x)).toEqual([]);
   });
+  it('1 分鐘一句時，同一個片段至少隔 20 句才會再出現', () => {
+    const t0 = Date.UTC(2026, 10, 18, 16);
+    for (const st of states) {
+      const lines = Array.from({ length: 300 }, (_, k) => memeAt(st, t0 + k * 60_000 + 1_000, 60).split(/[，。]/));
+      for (const part of [0, 1, 2]) {
+        const last = new Map<string, number>();
+        lines.forEach((l, k) => {
+          const prev = last.get(l[part]!);
+          if (prev != null) expect(k - prev).toBeGreaterThanOrEqual(20);
+          last.set(l[part]!, k);
+        });
+      }
+    }
+  });
   it('片段沒有重複', () => {
     for (const s of states) {
       const p = MEMES[s];
