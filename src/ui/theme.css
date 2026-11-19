@@ -388,89 +388,68 @@ body { overflow-x: hidden; }
 .radar-page.with-zoom { padding-bottom: 40px; }
 
 /*
- * 縮放鈕：固定在畫面最下方，下半截藏在分頁列後面，只冒出上半截。
- * - 左下、右下：從側面看的大圓柱，從角落斜斜伸出來，白色頂面＋灰色側面
- * - 正下方：從斜上方俯瞰，灰色大底座上一顆白色圓鈕
- * 按下去沿著軸往下沉一下。
+ * 縮放鈕：按鈕的樣子是「一根短柱＋上面一片薄薄的圓盤」，方便手指按。
+ * 固定在畫面最下方，大部分藏在分頁列與螢幕邊緣外：
+ * - 左下、右下：斜斜地從角落冒出來，只露出圓盤的一小塊半圓
+ * - 正下方：從分頁列後面冒出上半截
+ * 按下去圓盤沿著軸往下沉一下。
  */
 .radar-zoom {
   position: fixed;
   z-index: 900; /* 在分頁列（1000）後面 */
+  width: 128px;
+  height: 120px;
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.radar-zoom .body,
-.radar-zoom .cap { position: absolute; left: 0; right: 0; display: block; }
+/* 短柱 */
 .radar-zoom .body {
-  top: 22%;
+  position: absolute;
+  display: block;
+  left: 31%;
+  right: 31%;
+  top: 30px;
   bottom: 0;
-  background: linear-gradient(90deg, #5f666b 0%, #a9afb3 20%, #d9dddf 42%, #b6bcc0 64%, #6c7378 100%);
-  border-radius: 0 0 50% 50% / 0 0 18% 18%;
-  box-shadow: 0 0 24px rgba(0, 0, 0, 0.45);
+  background: linear-gradient(90deg, #6a7176 0%, #b3b9bd 30%, #e2e5e7 50%, #b3b9bd 70%, #6a7176 100%);
 }
+/* 薄圓盤：白色頂面（橢圓）＋一圈很薄的側邊 */
 .radar-zoom .cap {
+  position: absolute;
+  display: block;
+  left: 0;
+  right: 0;
   top: 0;
-  height: 44%;
+  height: 40px;
   border-radius: 50%;
-  background: radial-gradient(ellipse at 42% 38%, #ffffff 0%, #f6f7f8 45%, #dfe3e5 80%, #c4c9cc 100%);
-  border: 2px solid #aeb4b8;
-  box-sizing: border-box;
-  box-shadow: inset 0 -5px 10px rgba(0, 0, 0, 0.15);
+  background: radial-gradient(ellipse at 45% 40%, #ffffff 0%, #f5f6f7 50%, #e1e4e6 85%, #cdd2d5 100%);
+  box-shadow: 0 9px 0 #a9afb3, 0 9px 0 1px rgba(0, 0, 0, 0.12), 0 14px 18px rgba(0, 0, 0, 0.35);
   transition: transform 0.08s ease-out;
 }
+.radar-zoom:active .cap { transform: translateY(7px); box-shadow: 0 3px 0 #a9afb3, 0 6px 10px rgba(0, 0, 0, 0.3); }
+.radar-zoom.pressed .cap { animation: zoom-push 0.22s ease-out; }
+@keyframes zoom-push {
+  0% { transform: translateY(7px); box-shadow: 0 3px 0 #a9afb3, 0 6px 10px rgba(0, 0, 0, 0.3); }
+  100% { transform: none; }
+}
 
-/* 側面看的圓柱：寬 150、高 190，從角落往畫面中央斜伸 */
+/* 角落：大部分在螢幕外，斜向畫面中央 */
 .radar-zoom.zoom-bl,
 .radar-zoom.zoom-br {
-  width: 150px;
-  height: 190px;
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 70px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 52px);
   transform-origin: 50% 100%;
 }
-.radar-zoom.zoom-bl { left: -14px; --tilt: 28deg; }
-.radar-zoom.zoom-br { right: -14px; --tilt: -28deg; }
-.radar-zoom.zoom-bl,
-.radar-zoom.zoom-br { transform: rotate(var(--tilt)); }
-.radar-zoom.zoom-bl:active,
-.radar-zoom.zoom-br:active { transform: rotate(var(--tilt)) translateY(12px); }
-.radar-zoom.zoom-bl.pressed,
-.radar-zoom.zoom-br.pressed { animation: zoom-push-side 0.22s ease-out; }
-@keyframes zoom-push-side {
-  0% { transform: rotate(var(--tilt)) translateY(12px); }
-  100% { transform: rotate(var(--tilt)); }
-}
+.radar-zoom.zoom-bl { left: -50px; transform: rotate(40deg); }
+.radar-zoom.zoom-br { right: -50px; transform: rotate(-40deg); }
 
-/* 正下方：灰色大底座（半圓）上一顆白色圓鈕，從斜上方看 */
+/* 正下方：不旋轉，從分頁列後面冒出圓盤和一點點柱子 */
 .radar-zoom.zoom-bc {
   left: 50%;
-  width: min(62vw, 260px);
-  height: 170px;
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 70px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) - 66px);
   transform: translateX(-50%);
 }
-.radar-zoom.zoom-bc::before {
-  content: '';
-  position: absolute;
-  left: -26%;
-  right: -26%;
-  top: 22%;
-  bottom: -40%;
-  border-radius: 50% 50% 0 0 / 55% 55% 0 0;
-  background: radial-gradient(ellipse at 50% 0%, #9aa1a5 0%, #737a7f 45%, #4f565b 100%);
-  border-top: 2px solid #b3b9bd;
-  box-shadow: 0 -2px 18px rgba(0, 0, 0, 0.45);
-}
-.radar-zoom.zoom-bc .body { top: 20%; bottom: 18%; }
-.radar-zoom.zoom-bc .cap { height: 46%; }
-.radar-zoom.zoom-bc:active .cap,
-.radar-zoom.zoom-bc:active .body { transform: translateY(10px); }
-.radar-zoom.zoom-bc.pressed .cap,
-.radar-zoom.zoom-bc.pressed .body { animation: zoom-push-bc 0.22s ease-out; }
-@keyframes zoom-push-bc { 0% { transform: translateY(10px); } 100% { transform: none; } }
-.radar-zoom.zoom-bc .body { transition: transform 0.08s ease-out; }
 
 /* 記錄按鈕：小小的，放在雷達左上角，不搶畫面 */
 .radar-record {
