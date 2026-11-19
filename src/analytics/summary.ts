@@ -16,20 +16,35 @@ export interface SlotRank {
   idleHours: number;
 }
 
+/** 一個槽位全城的預期時薪（混合相鄰時段、往全部資料收縮）；資料太少回傳 null */
+export function slotHourly(index: StatsIndex, settings: Settings, slot: Slot): SlotRank | null {
+  const v = viewAt(index, slot, settings.importWeight);
+  const c = v.city;
+  if (c.idleHours < 1 && c.orders < 3) return null;
+  const lam = (c.orders + 2 * rate(v.cityAll.orders, v.cityAll.idleHours, 1)) / (c.idleHours + 2);
+  const V = (c.sumNetFare + 3 * rate(v.cityAll.sumNetFare, v.cityAll.fareOrders, 200)) / (c.fareOrders + 3);
+  const D = (c.sumOrderMinutes + 3 * rate(v.cityAll.sumOrderMinutes, v.cityAll.durOrders, 25)) / (c.durOrders + 3);
+  const W = 60 / lam;
+  return { slot, hourly: (V / (W + D)) * 60, waitMin: W, perOrder: V, orders: c.orders, idleHours: c.idleHours };
+}
+
+/** 自己全部資料的平均預期時薪（和 slotHourly 同一套算法，當收工建議的比較基準） */
+export function averageHourly(index: StatsIndex, settings: Settings): number | null {
+  const a = viewAt(index, 'weekday:0', settings.importWeight).cityAll;
+  if (a.idleHours <= 0 || a.orders <= 0) return null;
+  const W = 60 / (a.orders / a.idleHours);
+  const V = rate(a.sumNetFare, a.fareOrders, 200);
+  const D = rate(a.sumOrderMinutes, a.durOrders, 25);
+  return (V / (W + D)) * 60;
+}
+
 /** 全城每個槽位的預期時薪（混合相鄰時段、往全部資料收縮） */
 export function bestSlots(index: StatsIndex, settings: Settings, top = 10): SlotRank[] {
   const out: SlotRank[] = [];
   for (const day of DAY_TYPES) {
     for (let h = 0; h < 24; h++) {
-      const slot: Slot = `${day}:${h}`;
-      const v = viewAt(index, slot, settings.importWeight);
-      const c = v.city;
-      if (c.idleHours < 1 && c.orders < 3) continue;
-      const lam = (c.orders + 2 * rate(v.cityAll.orders, v.cityAll.idleHours, 1)) / (c.idleHours + 2);
-      const V = (c.sumNetFare + 3 * rate(v.cityAll.sumNetFare, v.cityAll.fareOrders, 200)) / (c.fareOrders + 3);
-      const D = (c.sumOrderMinutes + 3 * rate(v.cityAll.sumOrderMinutes, v.cityAll.durOrders, 25)) / (c.durOrders + 3);
-      const W = 60 / lam;
-      out.push({ slot, hourly: (V / (W + D)) * 60, waitMin: W, perOrder: V, orders: c.orders, idleHours: c.idleHours });
+      const r = slotHourly(index, settings, `${day}:${h}`);
+      if (r) out.push(r);
     }
   }
   return out.sort((a, b) => b.hourly - a.hourly).slice(0, top);

@@ -624,3 +624,24 @@ body { overflow-x: hidden; }
 .legend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .legend-bar { flex: 1; min-width: 120px; height: 12px; border-radius: 999px;
   background: linear-gradient(90deg, rgb(30, 90, 110), rgb(40, 170, 90), rgb(230, 220, 60), rgb(245, 150, 40), rgb(235, 60, 50)); }
+
+/* 收工建議（SPEC 4.5.2） */
+.quit { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); margin-top: 12px; }
+.quit-title { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; color: var(--muted); }
+.quit-text { font-size: 17px; font-weight: 700; line-height: 1.45; margin-top: 4px; }
+.quit-keep .quit-text, .quit-better .quit-text { color: var(--accent); }
+.quit-wait .quit-text, .quit-worse .quit-text { color: var(--warn); }
+.quit-quit .quit-text { color: var(--danger); }
+.quit-bars { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 14px; }
+.quit-col { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.quit-val { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.quit-track { position: relative; width: 100%; height: 64px; display: flex; align-items: flex-end; justify-content: center; }
+.quit-track::after { content: ''; position: absolute; left: -3px; right: -3px; bottom: var(--avg); border-top: 1.5px dashed var(--muted); opacity: 0.7; }
+.quit-bar { width: 70%; max-width: 28px; border-radius: 6px 6px 2px 2px; background: var(--accent); }
+.quit-bar.weak { background: var(--warn); opacity: 0.75; }
+.quit-hour { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.quit-legend { font-size: 12px; color: var(--muted); margin-top: 10px; }
+.radar-quit { font-size: 14px; font-weight: 700; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radar-quit.quit-keep, .radar-quit.quit-better { color: var(--accent); }
+.radar-quit.quit-wait, .radar-quit.quit-worse { color: var(--warn); }
+.radar-quit.quit-quit { color: var(--danger); }

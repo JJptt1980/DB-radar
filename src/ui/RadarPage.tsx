@@ -20,6 +20,7 @@ import { getState, loadAll, press } from './store';
 import { saveSettings } from '../db/db';
 import { useAppState } from './store';
 import { useAnalytics } from './useAnalytics';
+import { useQuitAdvice } from './QuitCard';
 
 const RECALC_MS = 30_000;
 const RECALC_MOVE_M = 200;
@@ -349,11 +350,19 @@ function TopCard(props: {
         </div>
       )}
       <InfoCard {...props} />
+      {props.state === 'idle' && props.enough && <QuitLine now={now} />}
     </div>
   );
 }
 
-function InfoCard(props: { rec: Recommendation | null; enough: boolean; heading: number | null; loading: boolean }) {
+/** 收工建議的一行精簡版（記錄頁有完整的卡片） */
+function QuitLine({ now }: { now: number }) {
+  const q = useQuitAdvice(now);
+  if (!q) return null;
+  return <div class={`radar-quit quit-${q.verdict}`}>收工建議：{q.short}</div>;
+}
+
+function InfoCard(props:{ rec: Recommendation | null; enough: boolean; heading: number | null; loading: boolean }) {
   const { rec, enough } = props;
   if (props.loading) return <section class="radar-card muted">計算中…</section>;
   if (!rec) return <section class="radar-card muted">還沒有資料</section>;

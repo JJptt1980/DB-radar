@@ -12,6 +12,7 @@ import { Dialog } from './Dialog';
 import { EventEditor, REASON_LABEL } from './EventEditor';
 import { FareForm } from './FareForm';
 import { memeAt } from './memes';
+import { QuitCard, useQuitAdvice } from './QuitCard';
 import {
   DECLINE_PROMPT_MS,
   UNDO_MS,
@@ -97,6 +98,7 @@ export function RecordPage() {
   const avgFare = useMemo(() => avgRecentFare(official, Date.now()), [official]);
   const fareModel = useMemo(() => fitFareModel(official, Date.now()), [official]);
   const summary = shiftId ? shiftSummary(app.events, fares, shiftId, now) : null;
+  const quit = useQuitAdvice(now);
   const estimated = summary && summary.unpriced > 0;
   // 沒有車資的趟：用這趟上客到下客的分鐘數估（官方資料擬合），沒有載客時間才用平均
   const [tracks, setTracks] = useState<{ ts: number; lat: number; lon: number }[]>([]);
@@ -289,6 +291,9 @@ export function RecordPage() {
           待補車資 {pending.length} 筆
         </button>
       )}
+
+      {/* 放在大按鈕下面：開車時最常按的是按鈕，不能被擠到畫面外 */}
+      {quit && <QuitCard advice={quit} />}
 
       <section class="events">
         <h2>今天的事件</h2>
