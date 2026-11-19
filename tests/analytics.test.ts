@@ -336,3 +336,13 @@ describe('收入期間', () => {
     expect([all[0]!.earnings, all[0]!.trips, all[0]!.hourly]).toEqual([450, 3, 150]);
   });
 });
+
+import { dayPart } from '../src/analytics/slots';
+
+describe('一天六段', () => {
+  it('凌晨、早上、中午、下午、晚上、半夜', () => {
+    expect([2, 4, 5, 9, 10, 12, 13, 16, 17, 21, 22, 0, 1].map(dayPart)).toEqual([
+      'dawn', 'dawn', 'morning', 'morning', 'noon', 'noon', 'afternoon', 'afternoon', 'evening', 'evening', 'midnight', 'midnight', 'midnight',
+    ]);
+  });
+});

@@ -49,6 +49,29 @@ export function adjacentSlots(s: Slot): [Slot, Slot] {
   return [`${day}:${(hour + 23) % 24}`, `${day}:${(hour + 1) % 24}`];
 }
 
+export type DayPart = 'dawn' | 'morning' | 'noon' | 'afternoon' | 'evening' | 'midnight';
+
+export const DAY_PART_LABEL: Record<DayPart, string> = {
+  dawn: '凌晨',
+  morning: '早上',
+  noon: '中午',
+  afternoon: '下午',
+  evening: '晚上',
+  midnight: '半夜',
+};
+
+/** 一天分六段：凌晨 2–4、早上 5–9、中午 10–12、下午 13–16、晚上 17–21、半夜 22–1 */
+export function dayPart(hour: number): DayPart {
+  if (hour >= 2 && hour <= 4) return 'dawn';
+  if (hour >= 5 && hour <= 9) return 'morning';
+  if (hour >= 10 && hour <= 12) return 'noon';
+  if (hour >= 13 && hour <= 16) return 'afternoon';
+  if (hour >= 17 && hour <= 21) return 'evening';
+  return 'midnight';
+}
+
+export const slotHour = (s: Slot): number => parseSlot(s).hour;
+
 export function slotLabel(s: Slot): string {
   const { day, hour } = parseSlot(s);
   return `${DAY_LABEL[day]} ${hour} 點`;

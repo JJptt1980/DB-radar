@@ -2,7 +2,7 @@
 import type { ComponentType } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { StatsIndex } from '../analytics/stats';
-import { slotLabel } from '../analytics/slots';
+import { DAY_PART_LABEL, dayPart, slotHour, slotLabel } from '../analytics/slots';
 import { bestCells, bestSlots, declineStats, monthly, periods, type Grain, type OfficialHistory, type Period } from '../analytics/summary';
 import type { Fare, Settings, TripEvent } from '../db/types';
 import { bearingDeg, compassLabel, distanceM } from '../domain/geo';
@@ -100,7 +100,10 @@ export function StatsPage() {
           <tbody>
             {data.slots.map((s) => (
               <tr key={s.slot}>
-                <td>{slotLabel(s.slot)}</td>
+                <td>
+                  {slotLabel(s.slot)}
+                  <span class={`part part-${dayPart(slotHour(s.slot))}`}>{DAY_PART_LABEL[dayPart(slotHour(s.slot))]}</span>
+                </td>
                 <td>{Math.round(s.waitMin)} 分</td>
                 <td>{money(s.perOrder)}</td>
                 <td>{money(s.hourly)}</td>
@@ -168,29 +171,24 @@ export function StatsPage() {
 
 function MonthCard(props: { p: Period }) {
   const p = props.p;
+  // 實收數字最長，自己佔一整列；其他兩兩一列，數字都不換行
   return (
-    <div class="summary month">
+    <div class="summary month income">
+      <div>
+        <b>{money(p.earnings)}</b>
+        <span>{p.bonus > 0 ? `實收（含趟獎 ${money(p.bonus)}）` : '實收'}</span>
+      </div>
       <div>
         <b>{p.trips}</b>
         <span>趟</span>
       </div>
       <div>
-        <b>{money(p.earnings)}</b>
-        <span>實收</span>
+        <b>{p.hourly == null ? '—' : money(p.hourly)}</b>
+        <span>時薪</span>
       </div>
-      {p.bonus > 0 && (
-        <div>
-          <b>{money(p.bonus)}</b>
-          <span>趟獎（已含在實收）</span>
-        </div>
-      )}
       <div>
         <b>{p.onlineHours.toFixed(1)}</b>
         <span>上線小時</span>
-      </div>
-      <div>
-        <b>{p.hourly == null ? '—' : money(p.hourly)}</b>
-        <span>時薪</span>
       </div>
       <div>
         <b>{p.fareSum > 0 ? `${((p.surge / p.fareSum) * 100).toFixed(1)}%` : '—'}</b>
