@@ -272,8 +272,8 @@ const COLORS = {
 function drawBezel(ctx: CanvasRenderingContext2D, c: number, Ro: number, R: number) {
   ctx.save();
   ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-  ctx.shadowBlur = 18;
-  ctx.shadowOffsetY = 6;
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 4;
   const body = ctx.createLinearGradient(0, c - Ro, 0, c + Ro);
   body.addColorStop(0, '#ffffff');
   body.addColorStop(0.55, '#eef0f2');
@@ -288,7 +288,7 @@ function drawBezel(ctx: CanvasRenderingContext2D, c: number, Ro: number, R: numb
   ctx.save();
   ctx.beginPath();
   ctx.arc(c, c, Ro, 0, Math.PI * 2);
-  ctx.arc(c, c, R + 4, 0, Math.PI * 2, true);
+  ctx.arc(c, c, R + 3, 0, Math.PI * 2, true);
   ctx.clip();
   const shine = ctx.createRadialGradient(c - Ro * 0.45, c - Ro * 0.55, 0, c - Ro * 0.45, c - Ro * 0.55, Ro * 1.1);
   shine.addColorStop(0, 'rgba(255,255,255,0.95)');
@@ -308,10 +308,10 @@ function drawBezel(ctx: CanvasRenderingContext2D, c: number, Ro: number, R: numb
   const rim = ctx.createLinearGradient(0, c - R, 0, c + R);
   rim.addColorStop(0, '#5d6469');
   rim.addColorStop(1, '#a7adb2');
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 3;
   ctx.strokeStyle = rim;
   ctx.beginPath();
-  ctx.arc(c, c, R + 2.5, 0, Math.PI * 2);
+  ctx.arc(c, c, R + 1.5, 0, Math.PI * 2);
   ctx.stroke();
 }
 
@@ -378,7 +378,10 @@ function RadarCanvas(props: {
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
-      size = Math.min(canvas.parentElement!.parentElement!.clientWidth, 520);
+      // 盡量大，但整頁不超過一個螢幕高（不用上下滑）：扣掉上方卡片、下方小字與分頁列
+      const top = canvas.parentElement!.getBoundingClientRect().top + scrollY;
+      const avail = innerHeight - top - 150;
+      size = Math.max(240, Math.min(canvas.parentElement!.parentElement!.clientWidth, 520, avail));
       canvas.style.width = canvas.style.height = `${size}px`;
       // 按鈕位置用這個尺寸算（CSS 變數）
       canvas.parentElement!.style.setProperty('--s', `${size}px`);
@@ -387,6 +390,10 @@ function RadarCanvas(props: {
     };
     resize();
     addEventListener('resize', resize);
+    // 上方卡片內容變了（高度改變）時重新量
+    const ro = new ResizeObserver(() => resize());
+    const page = canvas.closest('.radar-page');
+    if (page?.firstElementChild) ro.observe(page.firstElementChild);
 
     const draw = (now: number) => {
       const p = latest.current;
@@ -402,8 +409,9 @@ function RadarCanvas(props: {
 
       const c = size / 2;
       // 俯瞰的裝置：最外圈白色外殼，裡面一圈深色內緣，再裡面是綠色螢幕
-      const Ro = c - 10;
-      const bezel = Math.max(14, size * 0.07);
+      // 外殼做薄（約為螢幕直徑的 3.5%），雷達面積盡量大
+      const Ro = c - 7;
+      const bezel = Math.max(8, size * 0.035);
       const R = Ro - bezel;
       const pxPerKm = R / range;
       const rot = ((p.heading ?? 0) * Math.PI) / 180;
@@ -540,6 +548,7 @@ function RadarCanvas(props: {
     return () => {
       cancelAnimationFrame(raf);
       removeEventListener('resize', resize);
+      ro.disconnect();
     };
   }, []);
 

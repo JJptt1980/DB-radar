@@ -381,11 +381,11 @@ body { overflow-x: hidden; }
 .radar-main { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 12px; }
 .radar-sub { font-size: 17px; color: var(--muted); margin-top: 4px; font-weight: 600; }
 .arrow { display: inline-block; font-size: 40px; color: var(--accent); transition: transform 0.4s ease; }
-.radar-wrap { display: flex; justify-content: center; }
+.radar-wrap { display: flex; justify-content: center; margin: 0 -14px; } /* 雷達比內容區寬一點，盡量大 */
 .radar-box { position: relative; }
 .radar-wrap canvas { position: relative; z-index: 1; display: block; touch-action: none; }
 /* 縮放鈕佔住畫面最下方，內容留空間給它 */
-.radar-page.with-zoom { padding-bottom: 150px; }
+.radar-page.with-zoom { padding-bottom: 40px; }
 
 /*
  * 縮放鈕：固定在畫面最下方，下半截藏在分頁列後面，只冒出上半截。
