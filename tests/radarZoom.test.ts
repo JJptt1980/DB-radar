@@ -54,16 +54,33 @@ describe('靠近熱點的距離分段', () => {
   });
 });
 
-import { MEMES, memeAt } from '../src/ui/memes';
+import { MEMES, memeAt, memeByIndex, memeCount } from '../src/ui/memes';
 
 describe('龍珠梗', () => {
-  it('每段時間換一句，依狀態分組，循環不重複', () => {
-    const a = memeAt('idle', 0, 30);
-    expect(memeAt('idle', 29_000, 30)).toBe(a);
-    expect(memeAt('idle', 30_000, 30)).not.toBe(a);
-    expect(MEMES.ontrip).toContain(memeAt('ontrip', 123_456, 30));
-    const seen = new Set(Array.from({ length: MEMES.idle.length }, (_, i) => memeAt('idle', i * 30_000, 30)));
-    expect(seen.size).toBe(MEMES.idle.length);
+  const states = ['idle', 'enroute', 'ontrip', 'offline'] as const;
+  it('每個狀態組得出的句數超過一天 2,880 句', () => {
+    for (const s of states) expect(memeCount(s)).toBeGreaterThanOrEqual(2880);
+  });
+  it('30 秒一句，同一天（台北時間）2,880 句全部不一樣', () => {
+    const dayStart = Date.UTC(2026, 10, 18, 16); // 台北 11/19 00:00
+    for (const s of states) {
+      const seen = new Set<string>();
+      for (let k = 0; k < 2880; k++) seen.add(memeAt(s, dayStart + k * 30_000 + 5_000, 30));
+      expect(seen.size).toBe(2880);
+    }
+  });
+  it('同一個 30 秒內不變；三段每次都會換', () => {
+    const t = Date.UTC(2026, 10, 19, 2, 0, 0);
+    expect(memeAt('idle', t + 1_000, 30)).toBe(memeAt('idle', t + 29_000, 30));
+    const a = memeByIndex('ontrip', 100).split(/[，。]/);
+    const b = memeByIndex('ontrip', 101).split(/[，。]/);
+    expect(a.filter((x, i) => x === b[i] && x)).toEqual([]);
+  });
+  it('片段沒有重複', () => {
+    for (const s of states) {
+      const p = MEMES[s];
+      for (const arr of [p.open, p.mid, p.close]) expect(new Set(arr).size).toBe(arr.length);
+    }
   });
 });
 
