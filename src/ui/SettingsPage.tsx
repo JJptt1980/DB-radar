@@ -195,6 +195,43 @@ export function SettingsPage() {
       </section>
 
       <section class="card">
+        <h2>成本（算淨收入用）</h2>
+        <div class="field-row">
+          <label class="field">
+            <span>每公里油錢＋保養（元）</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.1"
+              value={app.settings.costPerKm}
+              onChange={(e) => {
+                const v = Number(e.currentTarget.value);
+                if (Number.isFinite(v) && v >= 0) void setRadar({ costPerKm: v });
+              }}
+            />
+          </label>
+          <label class="field">
+            <span>每月固定支出（元）</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              step="100"
+              value={app.settings.monthlyFixedCost}
+              onChange={(e) => {
+                const v = Number(e.currentTarget.value);
+                if (Number.isFinite(v) && v >= 0) void setRadar({ monthlyFixedCost: Math.round(v) });
+              }}
+            />
+          </label>
+        </div>
+        <p class="muted small">
+          固定支出例如車行（車隊）月費、保險、車貸、停車費。里程用 Uber 資料的載客里程 × 1.4 估算（加上開去接客和空車移動）。每公里成本也會用在雷達算「開過去划不划算」。
+        </p>
+      </section>
+
+      <section class="card">
         <h2>記錄</h2>
         <label class="toggle">
           <input

@@ -590,6 +590,8 @@ body { overflow-x: hidden; }
 .heat { display: flex; flex-direction: column; gap: 12px; }
 .day-chips .chip { min-height: 44px; padding: 0 14px; }
 .grain-chips { margin: 14px 0 6px; }
+.net-switch { margin: 4px 0 12px; }
+.cost-note { margin: 10px 2px 0; line-height: 1.6; }
 /* 最佳時段的「早上／中午／下午…」小標：淡淡的底色＋同色小圓點，跟主色系一樣低調 */
 .part {
   display: inline-flex;

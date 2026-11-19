@@ -252,6 +252,22 @@ function IncomeCard(props: {
     }
   };
   const { events, fares, official, settings, now } = props;
+  // 實收 = Uber 匯給你的錢；淨收入 = 再扣掉油錢保養、過路費、每月固定支出
+  const [net, setNet] = useState(() => {
+    try {
+      return localStorage.getItem('dbradar-income-net') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const pickNet = (v: boolean) => {
+    setNet(v);
+    try {
+      localStorage.setItem('dbradar-income-net', v ? '1' : '0');
+    } catch {
+      // 記不住就算了
+    }
+  };
   const total = useMemo(() => periods(events, fares, settings, now, 'all', official)[0] ?? null, [events, fares, official, settings]);
   const rows = useMemo(
     () => periods(events, fares, settings, now, grain, official).slice(0, GRAIN_ROWS[grain]),
@@ -260,21 +276,37 @@ function IncomeCard(props: {
   return (
     <section class="card">
       <h2>收入</h2>
+      <div class="radio-row seg net-switch">
+        <button type="button" class={net ? 'chip' : 'chip active'} onClick={() => pickNet(false)}>
+          實收
+        </button>
+        <button type="button" class={net ? 'chip active' : 'chip'} onClick={() => pickNet(true)}>
+          淨收入
+        </button>
+      </div>
       {total && (
         <div class="summary month income">
           <div>
-            <b>{money(total.earnings)}</b>
-            <span>總實收</span>
+            <b>{money(net ? total.net : total.earnings)}</b>
+            <span>{net ? '總淨收入' : '總實收'}</span>
           </div>
           <div>
             <b>{total.trips.toLocaleString('zh-TW')}</b>
             <span>總趟數</span>
           </div>
           <div>
-            <b>{total.hourly == null ? '—' : money(total.hourly)}</b>
-            <span>平均時薪</span>
+            <b>{(net ? total.netHourly : total.hourly) == null ? '—' : money((net ? total.netHourly : total.hourly)!)}</b>
+            <span>{net ? '平均淨時薪' : '平均時薪'}</span>
           </div>
         </div>
+      )}
+      {total && net && (
+        <p class="muted small cost-note">
+          從實收 {money(total.earnings)} 扣掉：油錢保養約 {money(total.km * settings.costPerKm)}（約 {Math.round(total.km).toLocaleString('zh-TW')} 公里 × ${settings.costPerKm}）
+          {total.toll > 0 && `、過路費 ${money(total.toll)}`}
+          {total.fixedCost > 0 && `、固定支出 ${money(total.fixedCost)}`}
+          。{settings.monthlyFixedCost > 0 ? '' : '每月固定支出還沒填，'}到設定 →「成本」修改。
+        </p>
       )}
       <div class="chips grain-chips">
         {GRAINS.map(([g, label]) => (
@@ -291,9 +323,9 @@ function IncomeCard(props: {
             <tr>
               <th>期間</th>
               <th>趟</th>
-              <th>實收</th>
+              <th>{net ? '淨收入' : '實收'}</th>
               <th>時數</th>
-              <th>時薪</th>
+              <th>{net ? '淨時薪' : '時薪'}</th>
             </tr>
           </thead>
           <tbody>
@@ -302,11 +334,12 @@ function IncomeCard(props: {
                 <td>{periodLabel(grain, p.key)}</td>
                 <td>{p.trips.toLocaleString('zh-TW')}</td>
                 <td>
-                  {money(p.earnings)}
-                  {p.bonus > 0 && <div class="muted small">含獎 {money(p.bonus)}</div>}
+                  {money(net ? p.net : p.earnings)}
+                  {!net && p.bonus > 0 && <div class="muted small">含獎 {money(p.bonus)}</div>}
+                  {net && <div class="muted small">實收 {money(p.earnings)}</div>}
                 </td>
                 <td>{p.onlineHours.toFixed(0)}</td>
-                <td>{p.hourly == null ? '—' : money(p.hourly)}</td>
+                <td>{(net ? p.netHourly : p.hourly) == null ? '—' : money((net ? p.netHourly : p.hourly)!)}</td>
               </tr>
             ))}
           </tbody>

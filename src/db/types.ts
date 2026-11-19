@@ -149,6 +149,8 @@ export interface Settings {
   memeV2?: boolean;
   /** 隱藏統計分頁（金額比較敏感） */
   statsHidden: boolean;
+  /** 每月固定支出（車行費、保險、車貸、停車…），算淨收入用 */
+  monthlyFixedCost: number;
   /** 體感：手機傾斜時雷達跟著立體轉動（噱頭） */
   radarTilt: boolean;
 }
@@ -177,6 +179,7 @@ export const DEFAULT_SETTINGS: Settings = {
   memeIntervalSec: 60,
   memeEnabled: true,
   statsHidden: false,
+  monthlyFixedCost: 0,
   radarTilt: true,
 };
 

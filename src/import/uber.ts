@@ -98,6 +98,7 @@ export function tripFromRow(r: Row, now: number): ImportedTrip | null {
       originalFare: r.original_fare_local ?? '',
       bookingFee: r.booking_fee_local ?? '',
       serviceFeeRate: r.service_fee ?? '',
+      toll: r.toll_amount_local ?? '',
     },
     updatedAt: now,
   };

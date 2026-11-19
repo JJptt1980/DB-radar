@@ -346,3 +346,31 @@ describe('一天六段', () => {
     ]);
   });
 });
+
+import { DRIVE_FACTOR, periodMonths } from '../src/analytics/summary';
+
+describe('淨收入', () => {
+  const trip = (id: string, ts: number, fare: number, km: number, toll = ''): ImportedTrip => ({
+    id, source: 'uber_zip', externalId: null, dedupeKey: id, requestTs: ts, pickupTs: ts, dropoffTs: ts + 3_600_000,
+    durationSec: 3600, distanceKm: km, pickupLat: null, pickupLon: null, dropoffLat: null, dropoffLon: null,
+    pickupAddress: null, dropoffAddress: null, pickupPrecision: null, dropoffPrecision: null,
+    fare, surge: 0, product: null, matchedDropoffEventId: null, raw: { toll }, updatedAt: 0,
+  });
+  it('扣掉里程成本、過路費、固定支出', () => {
+    const settings = { ...S, costPerKm: 3, monthlyFixedCost: 3000 };
+    const ts = Date.UTC(2026, 2, 10, 4); // 台北 3 月
+    const [m] = periods([], new Map(), settings, Date.UTC(2026, 10, 1), 'month', { trips: [trip('a', ts, 500, 10, '40')], idle: [] });
+    expect(m!.key).toBe('2026-03');
+    expect(m!.km).toBeCloseTo(10 * DRIVE_FACTOR);
+    expect(m!.fixedCost).toBeCloseTo(3000 * (31 / 30.44));
+    expect(m!.net).toBeCloseTo(500 - 14 * 3 - 40 - m!.fixedCost);
+    expect(m!.netHourly).toBeCloseTo(m!.net / 1);
+  });
+  it('分攤月數：完整的月、半年、年；進行中的期間只算到現在', () => {
+    const now = Date.UTC(2026, 9, 1) - 8 * 3_600_000; // 台北 2026-10-01 00:00
+    expect(periodMonths('half', '2026 上半年', now, 0)).toBeCloseTo(181 / 30.44);
+    expect(periodMonths('year', '2026 年', now, 0)).toBeCloseTo(273 / 30.44);
+    expect(periodMonths('week', '2026-09-21', now, 0)).toBeCloseTo(7 / 30.44);
+    expect(periodMonths('month', '2026-12', now, 0)).toBe(0);
+  });
+});

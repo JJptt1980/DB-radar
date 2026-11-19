@@ -104,9 +104,25 @@ export interface Period {
   fareSum: number;
   onlineHours: number;
   hourly: number | null;
+  /** 估計開車里程（載客里程 × DRIVE_FACTOR） */
+  km: number;
+  /** 代墊的過路費（含在實收裡，算淨收入時扣回） */
+  toll: number;
+  /** 這段期間分攤到的每月固定支出 */
+  fixedCost: number;
+  /** 淨收入 = 實收 − 里程 × 每公里成本 − 過路費 − 固定支出 */
+  net: number;
+  netHourly: number | null;
+  firstTs: number;
+  lastTs: number;
 }
 
 const MS_H = 3_600_000;
+
+/** 載客里程之外，還有開去接客、空車移動；粗估總里程 = 載客里程 × 1.4 */
+export const DRIVE_FACTOR = 1.4;
+/** 按鈕記錄的行程不知道里程時用這個（約為官方資料的平均載客里程） */
+const DEFAULT_TRIP_KM = 7;
 
 /** Uber 官方資料（沒有和自己按鈕記錄重疊的部分），讓統計頁也看得到歷史 */
 export interface OfficialHistory {
@@ -127,9 +143,24 @@ function periodsBy(
   const map = new Map<string, Period>();
   const get = (k: string) => {
     let p = map.get(k);
-    if (!p) map.set(k, (p = { key: k, trips: 0, earnings: 0, bonus: 0, surge: 0, fareSum: 0, onlineHours: 0, hourly: null }));
+    if (!p)
+      map.set(
+        k,
+        (p = {
+          key: k, trips: 0, earnings: 0, bonus: 0, surge: 0, fareSum: 0, onlineHours: 0, hourly: null,
+          km: 0, toll: 0, fixedCost: 0, net: 0, netHourly: null, firstTs: Infinity, lastTs: -Infinity,
+        }),
+      );
     return p;
   };
+  const touch = (p: Period, ts: number) => {
+    p.firstTs = Math.min(p.firstTs, ts);
+    p.lastTs = Math.max(p.lastTs, ts);
+  };
+  const avgKm = (() => {
+    const ds = (official?.trips ?? []).filter((t) => t.source === 'uber_zip' && t.distanceKm != null).map((t) => t.distanceKm!);
+    return ds.length >= 20 ? ds.reduce((a, b) => a + b, 0) / ds.length : DEFAULT_TRIP_KM;
+  })();
   const live = liveEvents(events);
   let onlineAt: number | null = null;
   for (const e of live) {
@@ -140,6 +171,8 @@ function periodsBy(
     } else if (e.type === 'dropoff') {
       const p = get(keyOf(e.ts));
       p.trips++;
+      p.km += avgKm * DRIVE_FACTOR;
+      touch(p, e.ts);
       const f = fares.get(e.id);
       if (f && !f.deleted && f.fare != null) {
         p.earnings += netFare(f, settings);
@@ -168,6 +201,9 @@ function periodsBy(
       if (t.source !== 'uber_zip' || t.requestTs == null || covered(t.requestTs)) continue;
       const p = get(keyOf(t.requestTs));
       p.trips++;
+      touch(p, t.requestTs);
+      p.km += (t.distanceKm ?? avgKm) * DRIVE_FACTOR;
+      p.toll += Number(t.raw?.toll) || 0;
       p.earnings += (t.fare ?? 0) + (settings.fareIncludesSurge ? 0 : (t.surge ?? 0));
       p.fareSum += t.fare ?? 0;
       p.surge += t.surge ?? 0;
@@ -186,8 +222,54 @@ function periodsBy(
     }
   }
 
-  for (const p of map.values()) p.hourly = p.onlineHours >= 0.1 ? p.earnings / p.onlineHours : null;
+  for (const p of map.values()) {
+    p.hourly = p.onlineHours >= 0.1 ? p.earnings / p.onlineHours : null;
+    if (!Number.isFinite(p.firstTs)) p.firstTs = p.lastTs = now;
+    applyCosts(p, settings, 0);
+  }
   return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
+}
+
+function applyCosts(p: Period, settings: Settings, months: number) {
+  p.fixedCost = months * (settings.monthlyFixedCost ?? 0);
+  p.net = p.earnings - p.km * settings.costPerKm - p.toll - p.fixedCost;
+  p.netHourly = p.onlineHours >= 0.1 ? p.net / p.onlineHours : null;
+}
+
+const MONTH_MS = 30.44 * 24 * MS_H;
+const TPE = 8 * MS_H;
+/** 台北時間某天 00:00 的時間戳 */
+const tpeDate = (y: number, m: number, d = 1) => Date.UTC(y, m - 1, d) - TPE;
+
+/** 這個期間有幾個月要分攤固定支出：進行中的期間只算到現在，「全部」從第一筆資料算起 */
+export function periodMonths(grain: Grain, key: string, now: number, firstTs: number): number {
+  let start: number;
+  let end: number;
+  if (grain === 'all') {
+    start = firstTs;
+    end = now;
+  } else if (grain === 'week') {
+    const [y, m, d] = key.split('-').map(Number) as [number, number, number];
+    start = tpeDate(y, m, d);
+    end = start + 7 * 24 * MS_H;
+  } else if (grain === 'month') {
+    const [y, m] = key.split('-').map(Number) as [number, number];
+    start = tpeDate(y, m);
+    end = tpeDate(m === 12 ? y + 1 : y, m === 12 ? 1 : m + 1);
+  } else {
+    const y = Number(key.slice(0, 4));
+    if (grain === 'year') {
+      start = tpeDate(y, 1);
+      end = tpeDate(y + 1, 1);
+    } else if (key.includes('上半年')) {
+      start = tpeDate(y, 1);
+      end = tpeDate(y, 7);
+    } else {
+      start = tpeDate(y, 7);
+      end = tpeDate(y + 1, 1);
+    }
+  }
+  return Math.max(0, (Math.min(end, now) - start) / MONTH_MS);
 }
 
 /** ISO 週（台北時間，週一開始），鍵是那一週週一的日期 */
@@ -226,7 +308,9 @@ export function periods(
   grain: Grain,
   official?: OfficialHistory,
 ): Period[] {
-  return periodsBy(events, fares, settings, KEY_OF[grain], now, official);
+  const list = periodsBy(events, fares, settings, KEY_OF[grain], now, official);
+  for (const p of list) applyCosts(p, settings, periodMonths(grain, p.key, now, p.firstTs));
+  return list;
 }
 
 export function weekly(
