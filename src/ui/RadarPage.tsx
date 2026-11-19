@@ -2,7 +2,8 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { hasEnoughData, recommend, type Candidate, type Recommendation, MIN_TRIPS } from '../analytics/model';
-import { slotLabel, slotOf } from '../analytics/slots';
+import { DAY_TYPES, slotLabel, slotOf, type Slot } from '../analytics/slots';
+import { mergedView } from '../analytics/heat';
 import { compassLabel, distanceM, type LatLon } from '../domain/geo';
 import { lastFix, onFix } from '../sensors/gps';
 import { useHeading } from '../sensors/heading';
@@ -103,10 +104,14 @@ export function RadarPage() {
   useWakeLock(true);
 
   const slot = slotOf(calc.at, new Set(app.settings.holidays));
-  const rec = useMemo<Recommendation | null>(
-    () => (index ? recommend(index, slot, calc.pos, app.settings) : null),
-    [index, slot, calc.pos, app.settings],
-  );
+  // 這個時段（含相鄰時段）全城都沒有任何有資料的格子時，改用「不分時段」的熱點，雷達才不會一片空白
+  const { rec, allTime } = useMemo<{ rec: Recommendation | null; allTime: boolean }>(() => {
+    if (!index) return { rec: null, allTime: false };
+    const r = recommend(index, slot, calc.pos, app.settings);
+    if (r.candidates.some((c) => !c.here) || r.far.length > 0 || hasEnoughData(r.here)) return { rec: r, allTime: false };
+    const all = mergedView(index, DAY_TYPES.flatMap((d) => Array.from({ length: 24 }, (_, h) => `${d}:${h}` as Slot)), app.settings.importWeight);
+    return { rec: recommend(index, slot, calc.pos, app.settings, all), allTime: true };
+  }, [index, slot, calc.pos, app.settings]);
   // 附近沒有熱點時，改畫範圍外最近的那些，雷達也放大到看得到它們
   const near = useMemo(() => (rec ? rec.candidates.filter((c) => !c.here).slice(0, MAX_DOTS) : []), [rec]);
   const farOnly = !!rec && near.length === 0 && rec.far.length > 0;
@@ -140,7 +145,7 @@ export function RadarPage() {
       />
       {/* 時段、資料量等小字放在卡片下方，雷達下面整塊留給縮放鈕，雷達才能滿版 */}
       <p class="radar-foot">
-        {slotLabel(slot)}・資料 {tripCount} 趟
+        {allTime ? `${slotLabel(slot)}沒資料・顯示全部時段` : slotLabel(slot)}・資料 {tripCount} 趟
         {rec && enough && `・信心度${CONF_LABEL[rec.best.confidence]}`}
         {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'held' ? '・車頭朝上（停車鎖定）' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
         {!calc.real && '・還沒有定位，先用預設中心'}

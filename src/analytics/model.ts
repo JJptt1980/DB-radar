@@ -201,8 +201,8 @@ export function scoreCell(est: CellEstimate, from: LatLon, here: boolean, settin
 }
 
 /** 雷達推薦（4.5）：範圍內每個資料夠的格子，加上原地不動，依預期時薪排序 */
-export function recommend(index: StatsIndex, slot: Slot, from: LatLon, settings: Settings): Recommendation {
-  const view = viewAt(index, slot, settings.importWeight);
+export function recommend(index: StatsIndex, slot: Slot, from: LatLon, settings: Settings, viewOverride?: SlotView): Recommendation {
+  const view = viewOverride ?? viewAt(index, slot, settings.importWeight);
   const hereCell = latLngToCell(from.lat, from.lon, index.res);
   const here = scoreCell(estimate(view, hereCell, settings), from, true, settings);
   const candidates: Candidate[] = [here];
