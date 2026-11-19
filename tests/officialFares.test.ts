@@ -40,3 +40,24 @@ describe('withOfficialFares', () => {
     expect(m.has('a')).toBe(false);
   });
 });
+
+import { avgRecentFare } from '../src/analytics/officialFares';
+import { shiftSummary } from '../src/domain/state';
+
+describe('記錄頁的估計', () => {
+  it('avgRecentFare 用最近 60 天，不足 20 趟時改用全部', () => {
+    const now = T0 + 100 * 86_400_000;
+    const recent = Array.from({ length: 20 }, (_, i) => trip(`r${i}`, now - i * 3_600_000, 200));
+    const old = [trip('o', T0, 500)];
+    expect(avgRecentFare([...recent, ...old], now)).toBe(200);
+    expect(avgRecentFare([recent[0]!, ...old], now)).toBe(350);
+    expect(avgRecentFare([], now)).toBeNull();
+  });
+
+  it('shiftSummary 算出還沒有車資的趟數', () => {
+    const on: TripEvent = { ...ev('on', T0 - 3_600_000), type: 'online' };
+    const fares = new Map<string, Fare>([['a', { id: 'a', fare: 150, surge: null, tip: null, note: '', pending: false, updatedAt: 1 }]]);
+    const s = shiftSummary([on, ev('a', T0), ev('b', T0 + 60_000)], fares, 's', T0 + 3_600_000);
+    expect([s.trips, s.earnings, s.unpriced]).toEqual([2, 150, 1]);
+  });
+});

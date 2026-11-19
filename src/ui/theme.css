@@ -242,7 +242,6 @@ body {
 .act-pickup { background: var(--warn); color: #2a1a00; border-color: var(--warn); }
 .act-dropoff { background: var(--info); color: #001a2a; border-color: var(--info); }
 .act-offline, .act-cancel { color: var(--danger); }
-.summary-wide { grid-column: span 2; }
 
 /* 一顆大圓鈕：狀態顏色、按下去縮一下、光圈往外擴散 */
 .ritual {

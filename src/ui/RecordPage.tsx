@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import type { EventType, TripEvent } from '../db/types';
+import type { EventType, ImportedTrip, TripEvent } from '../db/types';
+import { avgRecentFare, withOfficialFares } from '../analytics/officialFares';
+import { getAllImportedTrips } from '../db/db';
 import { EVENT_LABEL, STATE_LABEL, allowedActions, liveEvents, shiftSummary } from '../domain/state';
 import { fmtDuration, fmtTime, startOfTaipeiDay } from '../domain/time';
 import { needsBackupReminder } from '../backup/policy';
@@ -83,7 +85,19 @@ export function RecordPage() {
   const primary = actions.filter((a) => PRIMARY.includes(a));
   const secondary = actions.filter((a) => !PRIMARY.includes(a));
 
-  const summary = shiftId ? shiftSummary(app.events, app.fares, shiftId, now) : null;
+  // 官方資料：補上已對到的車資，還沒對到的用最近的平均實收估
+  const [official, setOfficial] = useState<ImportedTrip[]>([]);
+  useEffect(() => {
+    void getAllImportedTrips().then((t) => setOfficial(t.filter((x) => x.source === 'uber_zip')));
+  }, [app.events.length]);
+  const fares = useMemo(() => withOfficialFares(app.events, app.fares, official), [app.events, app.fares, official]);
+  const avgFare = useMemo(() => avgRecentFare(official, Date.now()), [official]);
+  const summary = shiftId ? shiftSummary(app.events, fares, shiftId, now) : null;
+  const estimated = summary && summary.unpriced > 0;
+  const earningsShown = summary ? summary.earnings + (summary.unpriced ? summary.unpriced * (avgFare ?? 0) : 0) : 0;
+  const hours = summary ? summary.onlineMs / 3_600_000 : 0;
+  const hourlyShown =
+    summary && hours >= 0.05 && (!summary.unpriced || avgFare != null) ? earningsShown / hours : null;
 
   const live = useMemo(() => liveEvents(app.events), [app.events]);
   const today = useMemo(() => {
@@ -140,23 +154,14 @@ export function RecordPage() {
               <b>{summary.trips}</b>
               <span>趟</span>
             </div>
-            {askFare ? (
-              <>
-                <div>
-                  <b>{money(summary.earnings)}</b>
-                  <span>實收</span>
-                </div>
-                <div>
-                  <b>{summary.hourly == null ? '—' : money(summary.hourly)}</b>
-                  <span>時薪</span>
-                </div>
-              </>
-            ) : (
-              <div class="summary-wide">
-                <b>{fmtDuration(summary.onlineMs)}</b>
-                <span>本班上線（車資匯入官方資料後補上）</span>
-              </div>
-            )}
+            <div>
+              <b>{summary.unpriced && avgFare == null ? '—' : money(earningsShown)}</b>
+              <span>{estimated ? '實收（估）' : '實收'}</span>
+            </div>
+            <div>
+              <b>{hourlyShown == null ? '—' : money(hourlyShown)}</b>
+              <span>{estimated ? '時薪（估）' : '時薪'}</span>
+            </div>
           </div>
         )}
         <GpsLine status={gps.status} accuracy={gps.fix?.accuracy ?? null} />

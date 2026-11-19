@@ -139,6 +139,8 @@ export function deriveSegments(events: readonly TripEvent[]): Segment[] {
 export interface ShiftSummary {
   trips: number;
   earnings: number;
+  /** 還沒有車資的趟數（沒填、也還沒從官方資料補上） */
+  unpriced: number;
   onlineMs: number;
   hourly: number | null;
 }
@@ -153,15 +155,17 @@ export function shiftSummary(
   const shift = liveEvents(events).filter((e) => e.shiftId === shiftId);
   let trips = 0;
   let earnings = 0;
+  let unpriced = 0;
   for (const e of shift) {
     if (e.type !== 'dropoff') continue;
     trips++;
     const f = fares.get(e.id);
-    if (f && !f.deleted) earnings += (f.fare ?? 0) + (f.tip ?? 0);
+    if (f && !f.deleted && f.fare != null) earnings += f.fare + (f.tip ?? 0);
+    else unpriced++;
   }
   const start = shift.find((e) => e.type === 'online')?.ts ?? shift[0]?.ts ?? now;
   const endEvt = shift.find((e) => e.type === 'offline');
   const onlineMs = Math.max(0, (endEvt?.ts ?? now) - start);
   const hours = onlineMs / 3_600_000;
-  return { trips, earnings, onlineMs, hourly: hours >= 0.05 ? Math.round(earnings / hours) : null };
+  return { trips, earnings, unpriced, onlineMs, hourly: hours >= 0.05 ? Math.round(earnings / hours) : null };
 }

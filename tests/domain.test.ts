@@ -111,7 +111,7 @@ describe('shiftSummary', () => {
     const events = [ev('online', 0), ev('accept', 5), ev('pickup', 10), ev('dropoff', 30)];
     const fare: Fare = { id: 'dropoff-30', fare: 300, surge: 50, tip: 20, note: '', pending: false, updatedAt: 0 };
     const sum = shiftSummary(events, new Map([[fare.id, fare]]), 's1', T0 + 60 * MIN);
-    expect(sum).toEqual({ trips: 1, earnings: 320, onlineMs: 60 * MIN, hourly: 320 });
+    expect(sum).toEqual({ trips: 1, earnings: 320, unpriced: 0, onlineMs: 60 * MIN, hourly: 320 });
   });
 
   it('待補車資的趟數照算，金額先算 0', () => {
