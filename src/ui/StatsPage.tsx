@@ -263,7 +263,7 @@ function IncomeCard(props: {
     <section class="card">
       <h2>收入</h2>
       {total && (
-        <div class="summary month">
+        <div class="summary month income">
           <div>
             <b>{money(total.earnings)}</b>
             <span>總實收</span>
