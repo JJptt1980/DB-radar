@@ -410,7 +410,7 @@ function RadarCanvas(props: {
       const c = size / 2;
       // 俯瞰的裝置：最外圈白色外殼，裡面一圈深色內緣，再裡面是綠色螢幕
       // 外殼做薄（約為螢幕直徑的 3.5%），雷達面積盡量大
-      const Ro = c - 7;
+      const Ro = c - 1; // 外殼頂到畫布邊緣（畫布與螢幕同寬）
       const bezel = Math.max(8, size * 0.035);
       const R = Ro - bezel;
       const pxPerKm = R / range;
