@@ -145,11 +145,15 @@ export function SettingsPage() {
         <p>
           事件 {liveCount} 筆・軌跡點 {tracks ?? '…'} 筆
         </p>
-        <p class={app.persist === 'granted' ? 'ok' : 'warn'}>
-          持久儲存：{app.persist ? PERSIST_TEXT[app.persist] : '檢查中…'}
-        </p>
+        {app.persist !== 'granted' && app.backup?.linked ? (
+          <p class="muted">持久儲存：不需要。資料已同步到 Google Drive，就算瀏覽器清掉也能從 Drive 還原。</p>
+        ) : (
+          <p class={app.persist === 'granted' ? 'ok' : 'warn'}>
+            持久儲存：{app.persist ? PERSIST_TEXT[app.persist] : '檢查中…'}
+          </p>
+        )}
         <p class="muted">開啟方式：{isStandalone() ? '主畫面圖示' : '瀏覽器分頁（建議改從主畫面圖示開啟）'}</p>
-        {app.persist === 'denied' && (
+        {app.persist === 'denied' && !app.backup?.linked && (
           <>
             <p class="muted">
               Chrome 不會詢問，而是自己判斷要不要開啟。網站有通知權限時通常就會開啟。DB-radar
@@ -163,6 +167,24 @@ export function SettingsPage() {
       </section>
 
       <DriveCard />
+
+      <section class="card">
+        <h2>外觀</h2>
+        <p class="muted small">介面顏色（雷達螢幕和地圖維持深色）</p>
+        <div class="chips">
+          {(
+            [
+              ['dark', '深色'],
+              ['light', '淺色'],
+              ['system', '跟隨系統'],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} type="button" class={app.settings.theme === k ? 'chip active' : 'chip'} onClick={() => void setRadar({ theme: k })}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section class="card">
         <h2>記錄</h2>
@@ -188,7 +210,15 @@ export function SettingsPage() {
         </label>
         <label class="toggle">
           <input type="checkbox" checked={app.settings.radarSound} onChange={(e) => void setRadar({ radarSound: e.currentTarget.checked })} />
-          <span>縮放按鈕音效</span>
+          <span>音效（縮放按鈕、靠近熱點時嗶嗶）</span>
+        </label>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={app.settings.radarRecordButton}
+            onChange={(e) => void setRadar({ radarRecordButton: e.currentTarget.checked })}
+          />
+          <span>雷達頁顯示記錄按鈕（接單、上客、下客，不用切回記錄頁）</span>
         </label>
         <p class="muted small">縮放按鈕放在哪個角落</p>
         <div class="chips">

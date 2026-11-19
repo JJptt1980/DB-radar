@@ -99,7 +99,10 @@ export async function countTrackPoints(shiftId?: string): Promise<number> {
 
 export async function getSettings(): Promise<Settings> {
   const s = (await (await db()).get('kv', 'settings')) as Partial<Settings> | undefined;
-  return { ...DEFAULT_SETTINGS, ...s };
+  const out = { ...DEFAULT_SETTINGS, ...s };
+  // 舊預設 6 km 太小，打開雷達常常什麼都看不到；設定頁沒有改這個值的地方，所以直接換成新預設
+  if (out.maxRadarKm === 6) out.maxRadarKm = DEFAULT_SETTINGS.maxRadarKm;
+  return out;
 }
 
 export async function saveSettings(s: Settings): Promise<void> {

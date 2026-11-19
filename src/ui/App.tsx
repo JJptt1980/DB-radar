@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { RecordPage } from './RecordPage';
 import { SettingsPage } from './SettingsPage';
 import { TABS, type TabId, parseTab } from './tabs';
+import { useAppState } from './store';
 
 export function App() {
   const [tab, setTab] = useState<TabId>(() => parseTab(location.hash));
@@ -20,6 +21,14 @@ export function App() {
       removeEventListener('offline', onNet);
     };
   }, []);
+
+  const theme = useAppState().settings.theme;
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    const light = theme === 'light' || (theme === 'system' && matchMedia('(prefers-color-scheme: light)').matches);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', light ? '#f3f6f4' : '#05100a');
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', light ? 'light' : 'dark');
+  }, [theme]);
 
   const current = TABS.find((t) => t.id === tab)!;
 

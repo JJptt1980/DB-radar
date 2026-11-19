@@ -8,8 +8,42 @@
   --warn: #ffc94a;
   --info: #5cc8ff;
   --danger: #ff6b6b;
+  --toast-bg: #102a1b;
+  --backdrop: rgba(0, 0, 0, 0.6);
   --tabbar-h: 72px;
   color-scheme: dark;
+}
+
+/* 淺色：設定選「淺色」，或選「跟隨系統」且系統是淺色。雷達螢幕與地圖本身維持深色 */
+:root[data-theme='light'] {
+  --bg: #f3f6f4;
+  --surface: #ffffff;
+  --line: #d3dfd7;
+  --text: #10221a;
+  --muted: #557063;
+  --accent: #14b850;
+  --warn: #c98500;
+  --info: #0b86c9;
+  --danger: #d33a3a;
+  --toast-bg: #e5f6ea;
+  --backdrop: rgba(0, 0, 0, 0.35);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+  --bg: #f3f6f4;
+    --surface: #ffffff;
+    --line: #d3dfd7;
+    --text: #10221a;
+    --muted: #557063;
+    --accent: #14b850;
+    --warn: #c98500;
+    --info: #0b86c9;
+    --danger: #d33a3a;
+    --toast-bg: #e5f6ea;
+    --backdrop: rgba(0, 0, 0, 0.35);
+    color-scheme: light;
+  }
 }
 
 * {
@@ -96,6 +130,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   background: var(--surface);
   border-top: 1px solid var(--line);
+  z-index: 1000; /* 比 Leaflet 地圖的圖層高，往下捲時地圖不會蓋住分頁列 */
 }
 
 .tab {
@@ -180,7 +215,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--backdrop);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -286,7 +321,7 @@ body {
   flex-wrap: wrap;
   padding: 12px 16px;
   border-radius: 16px;
-  background: #102a1b;
+  background: var(--toast-bg);
   border: 1px solid var(--accent);
 }
 .pending-btn { color: var(--warn); border-color: var(--warn); }
@@ -376,6 +411,7 @@ body {
 .corner-tr { top: -6px; right: -6px; }
 .corner-bl { bottom: -6px; left: -6px; }
 .corner-br { bottom: -6px; right: -6px; }
+.radar-record { min-height: 72px; font-size: 32px; font-weight: 800; letter-spacing: 0.1em; border-radius: 999px; }
 .radar-foot { text-align: center; color: var(--muted); font-size: 15px; margin: 0; }
 .progress { height: 10px; border-radius: 999px; background: var(--line); margin-top: 10px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); }
@@ -398,7 +434,7 @@ body {
 .hour-row { display: flex; align-items: center; gap: 14px; }
 .hour-slider { flex: 1; accent-color: var(--accent); height: 32px; }
 .hour-label { min-width: 3.5em; text-align: right; font-size: 20px; }
-.map { height: 58dvh; min-height: 320px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #111; }
+.map { height: 58dvh; min-height: 320px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #111; isolation: isolate; }
 .leaflet-container { font: inherit; background: #111; }
 .dark-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
 .leaflet-control-attribution { background: rgba(0, 0, 0, 0.6) !important; color: #bbb !important; }

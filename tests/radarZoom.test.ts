@@ -35,3 +35,21 @@ describe('光點合併', () => {
     expect(clusterRadius(100)).toBe(18);
   });
 });
+
+import { fitRange, nearBand } from '../src/ui/radarZoom';
+
+describe('打開雷達自動選範圍', () => {
+  it('選最小、但看得到 3 個點和第一名的那一段', () => {
+    expect(fitRange([0.5, 1, 2, 9], 1, 12)).toBe(3);
+    expect(fitRange([0.5, 1, 2, 9], 5, 12)).toBe(6);
+    expect(fitRange([4, 7, 10], 4, 12)).toBe(12);
+    expect(fitRange([1], 1, 12)).toBe(3); // 只有一個點也要看得到
+    expect(fitRange([], null, 12)).toBe(3);
+  });
+});
+
+describe('靠近熱點的距離分段', () => {
+  it('500／250／100 公尺', () => {
+    expect([nearBand(800), nearBand(400), nearBand(200), nearBand(50)]).toEqual([0, 1, 2, 3]);
+  });
+});

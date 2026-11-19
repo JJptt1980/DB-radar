@@ -135,6 +135,10 @@ export interface Settings {
   radarCorner: 'tl' | 'tr' | 'bl' | 'br';
   /** 雷達縮放按鈕的音效 */
   radarSound: boolean;
+  /** 介面（雷達螢幕與地圖以外）的深淺色 */
+  theme: 'dark' | 'light' | 'system';
+  /** 雷達頁顯示記錄按鈕（接單、上客、下客…） */
+  radarRecordButton: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -143,7 +147,7 @@ export const DEFAULT_SETTINGS: Settings = {
   costPerKm: 3,
   h3Res: 8,
   radarRingsKm: [1, 3, 5],
-  maxRadarKm: 6,
+  maxRadarKm: 12,
   trackIntervalSec: 30,
   holidays: [],
   homeCenter: { lat: 25.0478, lon: 121.517 },
@@ -156,6 +160,8 @@ export const DEFAULT_SETTINGS: Settings = {
   askFare: false,
   radarCorner: 'br',
   radarSound: true,
+  theme: 'dark',
+  radarRecordButton: true,
 };
 
 /** Drive 備份狀態，存在 kv（不進備份檔） */

@@ -7,8 +7,11 @@ import { lastFix, onFix } from '../sensors/gps';
 import { useHeading } from '../sensors/heading';
 import { useWakeLock } from '../sensors/wakeLock';
 import { Dialog } from './Dialog';
-import { clampRange, clusterDots, clusterRadius, nextZoom, niceStep, zoomStage, type Placed } from './radarZoom';
-import { playZoom } from './radarSound';
+import { clampRange, clusterDots, clusterRadius, fitRange, nearBand, nextZoom, niceStep, zoomStage, type Placed } from './radarZoom';
+import { playNear, playZoom } from './radarSound';
+import { allowedActions } from '../domain/state';
+import type { EventType } from '../db/types';
+import { press } from './store';
 import { useAppState } from './store';
 import { useAnalytics } from './useAnalytics';
 
@@ -18,10 +21,40 @@ const RECALC_MOVE_M = 200;
 const MAX_DOTS = 40;
 /** 螢幕上距離這麼近的點合成一個 */
 const CLUSTER_PX = 30;
-const ZOOM_KEY = 'dbradar-radar-range';
 const SAFETY_KEY = 'dbradar-radar-safety-ack';
 const CONF_LABEL = { low: '低', mid: '中', high: '高' } as const;
 const CONF_ALPHA = { low: 0.45, mid: 0.75, high: 1 } as const;
+
+const RECORD_TEXT: Partial<Record<EventType, string>> = { online: '上線', accept: '接單', pickup: '上客', dropoff: '下客' };
+
+/** 靠近第一名時嗶嗶：每進入更近的一段（500／250／100 公尺）響一次，換目標就重新算 */
+function useNearBeep(target: Candidate | null, on: boolean) {
+  const last = useRef<{ cell: string | null; band: number }>({ cell: null, band: 0 });
+  const latest = useRef({ target, on });
+  latest.current = { target, on };
+  useEffect(
+    () =>
+      onFix((f) => {
+        const { target: t, on: enabled } = latest.current;
+        if (!t || t.here) {
+          last.current = { cell: null, band: 0 };
+          return;
+        }
+        const band = nearBand(distanceM(f, t.center));
+        if (last.current.cell !== t.cell) last.current = { cell: t.cell, band: 0 };
+        if (band > last.current.band && enabled) {
+          playNear(band);
+          try {
+            navigator.vibrate?.(band === 3 ? [60, 60, 60] : 40);
+          } catch {
+            // 不支援震動就算了
+          }
+        }
+        last.current.band = band;
+      }),
+    [],
+  );
+}
 
 const money = (n: number) => `$${Math.round(n).toLocaleString('zh-TW')}`;
 const mins = (n: number) => `${Math.max(1, Math.round(n))} 分鐘`;
@@ -74,6 +107,9 @@ export function RadarPage() {
   const dots = useMemo(() => (rec ? rec.candidates.filter((c) => !c.here).slice(0, MAX_DOTS) : []), [rec]);
   const tripCount = index?.tripCount ?? 0;
   const enough = tripCount >= MIN_TRIPS;
+  const target = enough && rec && !rec.stay ? rec.best : null;
+  useNearBeep(target, app.settings.radarSound);
+  const recordAction = allowedActions(app.status.state).find((a) => a in RECORD_TEXT);
 
   return (
     <div class="radar-page">
@@ -94,6 +130,23 @@ export function RadarPage() {
         {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'held' ? '・車頭朝上（停車鎖定）' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
         {!calc.real && '・還沒有定位，先用預設中心'}
       </p>
+
+      {app.settings.radarRecordButton && recordAction && (
+        <button
+          type="button"
+          class={`btn radar-record act-${recordAction}`}
+          onClick={() => {
+            try {
+              navigator.vibrate?.(40);
+            } catch {
+              // 不支援震動就算了
+            }
+            void press(recordAction);
+          }}
+        >
+          {RECORD_TEXT[recordAction]}
+        </button>
+      )}
 
       {picked && (() => { const pc = picked.c; return (
         <Dialog title={`${compassLabel(pc.bearing)} ${pc.straightKm.toFixed(1)} km${picked.count > 1 ? `（這一區 ${picked.count} 格）` : ''}`} onClose={() => setPicked(null)}>
@@ -214,22 +267,6 @@ const COLORS = {
   sweep: 'rgba(160, 255, 180, 0.22)',
 };
 
-function readRange(maxKm: number): number {
-  try {
-    const v = Number(localStorage.getItem(ZOOM_KEY));
-    return v > 0 ? clampRange(v, maxKm) : maxKm;
-  } catch {
-    return maxKm;
-  }
-}
-function saveRange(km: number) {
-  try {
-    localStorage.setItem(ZOOM_KEY, String(km));
-  } catch {
-    // 存不起來就算了
-  }
-}
-
 function RadarCanvas(props: {
   dots: Candidate[];
   best: Candidate | null;
@@ -245,10 +282,22 @@ function RadarCanvas(props: {
   latest.current = props;
   const placed = useRef<{ c: Candidate; count: number; x: number; y: number }[]>([]);
   // 範圍：target 是要去的，shown 是畫面上的；每一幀 shown 往 target 靠，看起來是慢慢放大
-  const zoom = useRef({ target: readRange(props.maxKm), shown: readRange(props.maxKm) });
+  const zoom = useRef({ target: props.maxKm, shown: props.maxKm });
+  // 使用者自己按過按鈕或雙指縮放後，就不再自動調整範圍
+  const userZoomed = useRef(false);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ dist: number; range: number } | null>(null);
   const [pressed, setPressed] = useState(0);
+
+  // 打開雷達或熱點更新時，自動選一個看得到點的範圍
+  useEffect(() => {
+    if (userZoomed.current || !props.dots.length) return;
+    zoom.current.target = fitRange(
+      props.dots.map((d) => d.straightKm),
+      props.best?.straightKm ?? null,
+      props.maxKm,
+    );
+  }, [props.dots, props.best, props.maxKm]);
 
   useEffect(() => {
     const canvas = ref.current!;
@@ -441,7 +490,10 @@ function RadarCanvas(props: {
   };
   const onPointerDown = (e: PointerEvent) => {
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.current.size === 2) pinch.current = { dist: spread(), range: zoom.current.target };
+    if (pointers.current.size === 2) {
+      pinch.current = { dist: spread(), range: zoom.current.target };
+      userZoomed.current = true;
+    }
   };
   const onPointerMove = (e: PointerEvent) => {
     if (!pointers.current.has(e.pointerId)) return;
@@ -455,16 +507,13 @@ function RadarCanvas(props: {
   };
   const onPointerUp = (e: PointerEvent) => {
     pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2 && pinch.current) {
-      pinch.current = null;
-      saveRange(zoom.current.target);
-    }
+    if (pointers.current.size < 2) pinch.current = null;
   };
 
   const onZoomButton = () => {
     const z = zoom.current;
     z.target = nextZoom(z.target, props.maxKm);
-    saveRange(z.target);
+    userZoomed.current = true;
     if (props.sound) playZoom(zoomStage(z.target, props.maxKm));
     try {
       navigator.vibrate?.(20);

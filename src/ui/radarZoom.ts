@@ -24,6 +24,27 @@ export function zoomStage(currentKm: number, maxKm: number): number {
   return best;
 }
 
+/**
+ * 打開雷達時自動選範圍：三段裡最小、但能看到至少 3 個點（點不到 3 個就全部）和第一名的那一段，
+ * 不要一打開什麼都沒有。
+ */
+export function fitRange(distKm: readonly number[], bestKm: number | null, maxKm: number): number {
+  const need = Math.min(3, distKm.length);
+  for (const level of [...zoomLevels(maxKm)].reverse()) {
+    const inside = distKm.filter((d) => d <= level * 0.95).length;
+    if (inside >= need && (bestKm == null || bestKm <= level * 0.95)) return level;
+  }
+  return maxKm;
+}
+
+/** 靠近目標時的距離分段（公尺）：越近段數越高 */
+export const NEAR_BANDS_M = [500, 250, 100] as const;
+
+/** 目前在第幾段：0 = 還很遠，1 = 500 m 內，2 = 250 m 內，3 = 100 m 內 */
+export function nearBand(distM: number): number {
+  return NEAR_BANDS_M.filter((b) => distM <= b).length;
+}
+
 export const clampRange = (km: number, maxKm: number): number => Math.min(maxKm, Math.max(MIN_RANGE_KM, km));
 
 /** 好讀的刻度：0.1、0.2、0.25、0.5、1、2、2.5、5… 取不小於 x 的最小值 */

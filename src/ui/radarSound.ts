@@ -45,6 +45,17 @@ function beep(a: AudioContext, t: number, freq: number, dur = 0.07) {
   o.stop(t + dur + 0.01);
 }
 
+/** 靠近目標：越近嗶越多、越快、越高（band 1～3） */
+export function playNear(band: number): void {
+  const a = audio();
+  if (!a) return;
+  const t = a.currentTime + 0.01;
+  const n = [0, 2, 3, 5][band] ?? 2;
+  const gap = [0, 0.22, 0.16, 0.1][band] ?? 0.2;
+  const freq = 1900 + band * 250;
+  for (let i = 0; i < n; i++) beep(a, t + i * gap, freq, 0.06);
+}
+
 /** stage：放大後是第幾段（0 = 回到全範圍）。段數越高，嗶聲越高 */
 export function playZoom(stage: number): void {
   const a = audio();
