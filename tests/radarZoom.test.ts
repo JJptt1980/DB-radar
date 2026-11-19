@@ -91,3 +91,23 @@ describe('體感', () => {
     expect([clampTilt(30), clampTilt(-30), clampTilt(5)]).toEqual([14, -14, 5]);
   });
 });
+
+import { nearBeep } from '../src/ui/radarZoom';
+
+describe('靠近龍珠嗶嗶', () => {
+  it('每顆龍珠進入更近的一段才嗶，不會一直響；離開再回來會再響', () => {
+    const mem = new Map<string, number>();
+    const at = (a: number, b: number) => [
+      { cell: 'A', distM: a },
+      { cell: 'B', distM: b },
+    ];
+    expect(nearBeep(mem, at(900, 2000))).toBe(0);
+    expect(nearBeep(mem, at(450, 2000))).toBe(1);
+    expect(nearBeep(mem, at(420, 2000))).toBe(0); // 同一段不再響
+    expect(nearBeep(mem, at(200, 2000))).toBe(2);
+    expect(nearBeep(mem, at(80, 2000))).toBe(3);
+    expect(nearBeep(mem, at(300, 480))).toBe(1); // 換靠近另一顆
+    expect(nearBeep(mem, at(800, 900))).toBe(0); // 都離開了
+    expect(nearBeep(mem, at(450, 900))).toBe(1); // 回來再響
+  });
+});

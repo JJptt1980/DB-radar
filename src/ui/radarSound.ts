@@ -11,6 +11,28 @@ function audio(): AudioContext | null {
   }
 }
 
+/**
+ * 手機瀏覽器要使用者先點過畫面才准發出聲音。啟動時掛一個監聽：
+ * 第一次點到畫面任何地方就把音效解鎖，之後靠近龍珠的嗶嗶聲（由 GPS 觸發）才響得出來。
+ */
+export function installAudioUnlock(): void {
+  const unlock = () => {
+    const a = audio();
+    if (!a) return;
+    // 播一段無聲的音，確保解鎖
+    const src = a.createBufferSource();
+    src.buffer = a.createBuffer(1, 1, a.sampleRate);
+    src.connect(a.destination);
+    src.start();
+    if (a.state === 'running') {
+      removeEventListener('pointerdown', unlock, true);
+      removeEventListener('keydown', unlock, true);
+    }
+  };
+  addEventListener('pointerdown', unlock, true);
+  addEventListener('keydown', unlock, true);
+}
+
 /** 按下去的「喀」：很短的高頻雜訊 */
 function click(a: AudioContext, t: number) {
   const len = Math.round(a.sampleRate * 0.025);

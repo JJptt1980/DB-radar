@@ -45,6 +45,31 @@ export function nearBand(distM: number): number {
   return NEAR_BANDS_M.filter((b) => distM <= b).length;
 }
 
+/**
+ * 靠近龍珠（任何一個熱點）時要不要嗶：每個熱點各自記住「最近到過哪一段」，
+ * 進入更近的一段才嗶（同一顆不會一直響），離開 700 公尺以上就重置，下次再靠近會再響。
+ * 回傳這次要嗶的段數（0 = 不嗶）。
+ */
+export function nearBeep(
+  memory: Map<string, number>,
+  dots: readonly { cell: string; distM: number }[],
+): number {
+  let play = 0;
+  for (const d of dots) {
+    if (d.distM > 700) {
+      memory.delete(d.cell);
+      continue;
+    }
+    const band = nearBand(d.distM);
+    const prev = memory.get(d.cell) ?? 0;
+    if (band > prev) {
+      play = Math.max(play, band);
+      memory.set(d.cell, band);
+    }
+  }
+  return play;
+}
+
 export const clampRange = (km: number, maxKm: number): number => Math.min(maxKm, Math.max(MIN_RANGE_KM, km));
 
 /** 好讀的刻度：0.1、0.2、0.25、0.5、1、2、2.5、5… 取不小於 x 的最小值 */

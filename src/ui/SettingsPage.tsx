@@ -210,8 +210,14 @@ export function SettingsPage() {
         </label>
         <label class="toggle">
           <input type="checkbox" checked={app.settings.radarSound} onChange={(e) => void setRadar({ radarSound: e.currentTarget.checked })} />
-          <span>音效（縮放按鈕、靠近熱點時嗶嗶）</span>
+          <span>音效（縮放按鈕、靠近龍珠時嗶嗶）</span>
         </label>
+        <p class="muted small">
+          靠近雷達上任何一顆龍珠（黃點）時，進入 500、250、100 公尺各嗶一次，越近嗶越多、越快、越高，同時震動。要開著雷達頁才會響；打開 App 後先點一下畫面，手機才准發出聲音。
+        </p>
+        <button type="button" class="btn secondary" onClick={() => void import('./radarSound').then((m) => m.playNear(3))}>
+          試聽靠近龍珠的嗶嗶聲
+        </button>
         <label class="toggle">
           <input type="checkbox" checked={app.settings.radarTilt} onChange={(e) => void setRadar({ radarTilt: e.currentTarget.checked })} />
           <span>體感：傾斜手機時雷達跟著立體轉動（純好玩）</span>

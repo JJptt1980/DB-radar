@@ -8,7 +8,7 @@ import { lastFix, onFix } from '../sensors/gps';
 import { useHeading } from '../sensors/heading';
 import { useWakeLock } from '../sensors/wakeLock';
 import { Dialog } from './Dialog';
-import { clampRange, clusterDots, clusterRadius, fitRange, nearBand, nextZoom, niceStep, zoomStage, type Placed } from './radarZoom';
+import { clampRange, clusterDots, clusterRadius, fitRange, nearBeep, nextZoom, niceStep, zoomStage, type Placed } from './radarZoom';
 import { playNear, playZoom } from './radarSound';
 import { memeAt } from './memes';
 import { useTilt } from './useTilt';
@@ -31,22 +31,20 @@ const CONF_ALPHA = { low: 0.45, mid: 0.75, high: 1 } as const;
 
 const RECORD_TEXT: Partial<Record<EventType, string>> = { online: '上線', accept: '接單', pickup: '上客', dropoff: '下客' };
 
-/** 靠近第一名時嗶嗶：每進入更近的一段（500／250／100 公尺）響一次，換目標就重新算 */
-function useNearBeep(target: Candidate | null, on: boolean) {
-  const last = useRef<{ cell: string | null; band: number }>({ cell: null, band: 0 });
-  const latest = useRef({ target, on });
-  latest.current = { target, on };
+/** 靠近龍珠（雷達上任何一個熱點）時嗶嗶：進入 500／250／100 公尺各響一次，越近嗶越多越快 */
+function useNearBeep(dots: readonly Candidate[], on: boolean) {
+  const memory = useRef(new Map<string, number>());
+  const latest = useRef({ dots, on });
+  latest.current = { dots, on };
   useEffect(
     () =>
       onFix((f) => {
-        const { target: t, on: enabled } = latest.current;
-        if (!t || t.here) {
-          last.current = { cell: null, band: 0 };
-          return;
-        }
-        const band = nearBand(distanceM(f, t.center));
-        if (last.current.cell !== t.cell) last.current = { cell: t.cell, band: 0 };
-        if (band > last.current.band && enabled) {
+        const { dots: ds, on: enabled } = latest.current;
+        const band = nearBeep(
+          memory.current,
+          ds.map((d) => ({ cell: d.cell, distM: distanceM(f, d.center) })),
+        );
+        if (band && enabled) {
           playNear(band);
           try {
             navigator.vibrate?.(band === 3 ? [60, 60, 60] : 40);
@@ -54,7 +52,6 @@ function useNearBeep(target: Candidate | null, on: boolean) {
             // 不支援震動就算了
           }
         }
-        last.current.band = band;
       }),
     [],
   );
@@ -111,8 +108,9 @@ export function RadarPage() {
   const dots = useMemo(() => (rec ? rec.candidates.filter((c) => !c.here).slice(0, MAX_DOTS) : []), [rec]);
   const tripCount = index?.tripCount ?? 0;
   const enough = tripCount >= MIN_TRIPS;
-  const target = enough && rec && !rec.stay ? rec.best : null;
-  useNearBeep(target, app.settings.radarSound);
+  // 雷達上畫出來的所有熱點（含所在這一格，只要有資料）都算龍珠
+  const beepDots = useMemo(() => (enough && rec ? rec.candidates.filter((c) => hasEnoughData(c)) : []), [enough, rec]);
+  useNearBeep(beepDots, app.settings.radarSound);
   const recordAction = allowedActions(app.status.state).find((a) => a in RECORD_TEXT);
 
   return (
