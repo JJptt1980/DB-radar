@@ -129,6 +129,13 @@ export function RadarPage() {
         state={app.status.state}
         memeSec={app.settings.memeEnabled ? app.settings.memeIntervalSec : 0}
       />
+      {/* 時段、資料量等小字放在卡片下方，雷達下面整塊留給縮放鈕，雷達才能滿版 */}
+      <p class="radar-foot">
+        {slotLabel(slot)}・資料 {tripCount} 趟
+        {rec && enough && `・信心度${CONF_LABEL[rec.best.confidence]}`}
+        {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'held' ? '・車頭朝上（停車鎖定）' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
+        {!calc.real && '・還沒有定位，先用預設中心'}
+      </p>
       <RadarCanvas
         dots={enough ? dots : []}
         best={enough && rec && !rec.stay ? rec.best : null}
@@ -167,12 +174,6 @@ export function RadarPage() {
           }
         />
       </RadarCanvas>
-      <p class="radar-foot">
-        {slotLabel(slot)}・資料 {tripCount} 趟
-        {rec && enough && `・信心度${CONF_LABEL[rec.best.confidence]}`}
-        {heading.source === 'gps' ? '・車頭朝上' : heading.source === 'held' ? '・車頭朝上（停車鎖定）' : heading.source === 'compass' ? '・手機朝上' : '・北方朝上'}
-        {!calc.real && '・還沒有定位，先用預設中心'}
-      </p>
 
       {picked && (() => { const pc = picked.c; return (
         <Dialog title={`${compassLabel(pc.bearing)} ${pc.straightKm.toFixed(1)} km${picked.count > 1 ? `（這一區 ${picked.count} 格）` : ''}`} onClose={() => setPicked(null)}>
