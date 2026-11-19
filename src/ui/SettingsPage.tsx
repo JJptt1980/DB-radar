@@ -213,7 +213,7 @@ export function SettingsPage() {
           <span>音效（縮放按鈕、靠近龍珠時嗶嗶）</span>
         </label>
         <p class="muted small">
-          靠近雷達上任何一顆龍珠（黃點）時，進入 500、250、100 公尺各嗶一次，越近嗶越多、越快、越高，同時震動。只在空車時響；載客中所有雷達音效都靜音。要開著雷達頁才會響；打開 App 後先點一下畫面，手機才准發出聲音。
+          靠近雷達上任何一顆龍珠（黃點）時，進入 500、250、100 公尺各嗶一次，越近嗶越多、越快、越高，同時震動。空車時響；載客中預設靜音，要的話點雷達右上角的喇叭，只為這一趟打開。要開著雷達頁才會響；打開 App 後先點一下畫面，手機才准發出聲音。
         </p>
         <button type="button" class="btn secondary" onClick={() => void import('./radarSound').then((m) => m.playNear(3))}>
           試聽靠近龍珠的嗶嗶聲

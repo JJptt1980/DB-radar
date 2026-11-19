@@ -113,10 +113,15 @@ export function RadarPage() {
   // 雷達上畫出來的所有熱點（含所在這一格，只要有資料）都算龍珠
   const beepDots = useMemo(() => (enough && rec ? rec.candidates.filter((c) => hasEnoughData(c)) : []), [enough, rec]);
   // 載客中不出聲（乘客在車上）；前往接客時目標是乘客不是龍珠，也不嗶
-  const quiet = app.status.state === 'ontrip';
+  // 載客中預設靜音；點喇叭可以只為「這一趟」打開，下一趟又回到靜音
+  const ontrip = app.status.state === 'ontrip';
+  const tripId = ontrip ? lastPickupId(app.events) : null;
+  const [tripSoundFor, setTripSoundFor] = useState<string | null>(() => tripSoundOn);
+  const tripSound = ontrip && tripId != null && tripSoundFor === tripId;
+  const soundLive = ontrip ? tripSound : app.settings.radarSound;
   // 嗶的時候讓右上角的喇叭跟著閃（換 key 讓動畫重播）
   const [beep, setBeep] = useState<{ band: number; at: number } | null>(null);
-  useNearBeep(beepDots, app.settings.radarSound && app.status.state === 'idle', (band) => setBeep({ band, at: Date.now() }));
+  useNearBeep(beepDots, soundLive && (app.status.state === 'idle' || ontrip), (band) => setBeep({ band, at: Date.now() }));
   const recordAction = allowedActions(app.status.state).find((a) => a in RECORD_TEXT);
 
   return (
@@ -143,7 +148,7 @@ export function RadarPage() {
         maxKm={app.settings.maxRadarKm}
         sweep={app.settings.radarSweep}
         corner={app.settings.radarCorner}
-        sound={app.settings.radarSound && !quiet}
+        sound={soundLive}
         tilt={app.settings.radarTilt}
         onPick={(c, count) => setPicked({ c, count })}
       >
@@ -167,11 +172,18 @@ export function RadarPage() {
         <SoundBadge
           key={beep?.at ?? 0}
           beepBand={beep && Date.now() - beep.at < 1500 ? beep.band : 0}
-          on={app.settings.radarSound}
-          muted={app.status.state === 'ontrip'}
-          onToggle={() =>
-            void saveSettings({ ...getState().settings, radarSound: !getState().settings.radarSound }).then(loadAll)
-          }
+          on={soundLive}
+          muted={false}
+          ontrip={ontrip}
+          onToggle={() => {
+            if (ontrip) {
+              const next = tripSound ? null : tripId;
+              tripSoundOn = next;
+              setTripSoundFor(next);
+            } else {
+              void saveSettings({ ...getState().settings, radarSound: !getState().settings.radarSound }).then(loadAll);
+            }
+          }}
         />
       </RadarCanvas>
 
@@ -230,9 +242,24 @@ export function RadarPage() {
   );
 }
 
-function SoundBadge(props: { on: boolean; muted: boolean; beepBand: number; onToggle: () => void }) {
+/** 這一趟（上客事件 id）手動打開了音效；換頁回來還記得，下一趟自動失效 */
+let tripSoundOn: string | null = null;
+
+function lastPickupId(events: readonly { id: string; type: string; ts: number; deleted?: boolean }[]): string | null {
+  let best: { id: string; ts: number } | null = null;
+  for (const e of events) if (!e.deleted && e.type === 'pickup' && (!best || e.ts > best.ts)) best = e;
+  return best?.id ?? null;
+}
+
+function SoundBadge(props: { on: boolean; muted: boolean; ontrip: boolean; beepBand: number; onToggle: () => void }) {
   const live = props.on && !props.muted;
-  const label = !props.on ? '靠近龍珠的嗶嗶聲：關' : props.muted ? '載客中，嗶嗶聲暫停' : '靠近龍珠的嗶嗶聲：開';
+  const label = props.ontrip
+    ? live
+      ? '載客中：這一趟音效已打開（點一下關掉）'
+      : '載客中：靜音（點一下只為這一趟打開）'
+    : live
+      ? '靠近龍珠的嗶嗶聲：開'
+      : '靠近龍珠的嗶嗶聲：關';
   return (
     <button
       type="button"
