@@ -312,12 +312,12 @@ function InfoCard(props: { rec: Recommendation | null; enough: boolean; heading:
 }
 
 const COLORS = {
-  // 亮一點的淺綠螢幕，配深色格線（使用者 2026-11-19 參考圖）
-  screen: '#4fae5c',
+  // 深綠螢幕（使用者偏好最早的深色），玻璃反光與內陰影照樣保留
+  screen: '#1d6b35',
   screenEdge: '#0f3d1f',
-  grid: 'rgba(12, 48, 20, 0.7)',
-  ring: 'rgba(240, 255, 240, 0.55)',
-  label: 'rgba(255, 255, 255, 0.95)',
+  grid: 'rgba(5, 30, 14, 0.75)',
+  ring: 'rgba(200, 255, 210, 0.4)',
+  label: 'rgba(225, 255, 230, 0.9)',
   dot: '#ffd23f',
   best: '#fff3a0',
   me: '#ff3b30',
@@ -379,7 +379,7 @@ function drawGlass(ctx: CanvasRenderingContext2D, c: number, R: number) {
   ctx.clip();
   const edge = ctx.createRadialGradient(c, c, R * 0.82, c, c, R);
   edge.addColorStop(0, 'rgba(0,0,0,0)');
-  edge.addColorStop(1, 'rgba(0,30,10,0.4)');
+  edge.addColorStop(1, 'rgba(0,20,8,0.45)');
   ctx.fillStyle = edge;
   ctx.fillRect(c - R, c - R, R * 2, R * 2);
   const glare = ctx.createLinearGradient(c - R, c - R, c, c);
