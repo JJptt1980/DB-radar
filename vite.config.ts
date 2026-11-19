@@ -28,6 +28,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
         navigateFallback: '/DB-radar/index.html',
+        // 宣傳頁是獨立的靜態頁，不要被 App 的離線殼攔截
+        navigateFallbackDenylist: [/^\/DB-radar\/about\//],
         // 新版一裝好就接手，手機重開 App 就是最新版
         skipWaiting: true,
         clientsClaim: true,
