@@ -1,5 +1,7 @@
 # DB-radar
 
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-%E8%AB%8B%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/jjptt1980)
+
 司機用的個人熱點雷達 PWA。規格見 [SPEC.md](SPEC.md)。
 
 網址：https://jjptt1980.github.io/DB-radar/
