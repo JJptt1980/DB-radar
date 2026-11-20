@@ -123,6 +123,39 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(second['requestTs'] - first['requestTs'], 25 * 60_000)
         self.assertTrue(any('1 張畫面' in w for w in parse.validate(trips)))
 
+    def test_overlay_detected_and_ignored(self):
+        # 右欄固定不動的浮窗（電流監測）在 30 張畫面都出現；卡片時間剛好在浮窗旁邊時不採用
+        overlay = [line('33.5', 1005, 747, 60, 27), line('68%', 1008, 840, 57, 24)]
+        frames = [frame(HEADER + overlay + card(300 + i * 5), f'f_{i:04d}.png') for i in range(30)]
+        box = parse.find_overlay(frames)
+        self.assertEqual(box, (747, 864))
+        bad_card = card(650, time_text='上午 9:0②')  # 時間在 y=730，緊貼浮窗
+        bad_card[1]['bbox'][0] = 947  # 實機畫面上時間在右欄
+        bad = frame(HEADER + overlay + bad_card)
+        self.assertEqual(parse.parse_frame(bad, 2026, box)[0], [])
+        ok = frame(HEADER + overlay + card(1100))
+        self.assertEqual(parse.parse_frame(ok, 2026, box)[0][0].start, '09:05')
+        # 結尾停住的卡片不算浮窗（時間樣子的字排除、而且畫面太少）
+        self.assertIsNone(parse.find_overlay([frame(HEADER + card(300))] * 8))
+
+    def test_overlay_letter_stripped_from_product(self):
+        f = frame(HEADER + card(300, spec='A 標準型優步 · 12分鐘30秒 · 4.20 公里'))
+        self.assertEqual(parse.parse_frame(f, 2026)[0][0].product, '標準型優步')
+
+    def test_misread_time_merges_into_same_trip(self):
+        # 時間被浮窗蓋到讀錯（11:11 → 11:23），車資、時長、公里都一樣 → 同一趟，時間多數決
+        def obs(start, fare=140.0, dur=839, km=3.5, date=(11, 17)):
+            return parse.Observation('f', date, start, fare, 0.0, 'Electric', dur, km, '甲路', '乙路',
+                                     {'head': 1, 'spec': 1, 'pickup': 1, 'dropoff': 1})
+        trips = parse.build_trips([
+            obs('11:11'), obs('11:11'), obs('11:23'),
+            obs('12:30'),               # 同規格但差超過 30 分鐘：另一趟
+            obs('11:15', date=(11, 18)),  # 不同天：另一趟
+            obs('11:11', fare=99.0, dur=300, km=1.0),  # 同時間不同卡片內容：仍視為同一趟（沿用舊規則）
+        ], 2026, 0)
+        starts = sorted((t['dedupeKey'][:10], t['raw']['startLocal']) for t in trips)
+        self.assertEqual(starts, [('2026-11-17', '11:11'), ('2026-11-17', '12:30'), ('2026-11-18', '11:15')])
+
 
 if __name__ == '__main__':
     unittest.main()

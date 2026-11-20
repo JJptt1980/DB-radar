@@ -329,8 +329,11 @@ def main() -> int:
 
     observations, saw_end = [], False
     list_frames = 0
+    overlay = parse.find_overlay(ocr)
+    if overlay:
+        print(f'偵測到畫面右側固定不動的浮窗（y = {overlay[0]}～{overlay[1]}），附近的右欄文字不採用')
     for f in ocr:
-        obs, end = parse.parse_frame(f, year)
+        obs, end = parse.parse_frame(f, year, overlay)
         if parse.is_list_frame(parse.to_lines(f)):
             list_frames += 1
         observations += obs

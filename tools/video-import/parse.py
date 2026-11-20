@@ -199,13 +199,45 @@ def address_fully_visible(blocks: list[list[Line]], width: int, height: int) -> 
     return line_finished(last, width) or last.bottom + 1.2 * last.h <= height
 
 
-def parse_frame(frame: dict, year: int) -> tuple[list[Observation], bool]:
+def find_overlay(frames: list[dict], min_share: float = 0.4, min_count: int = 20) -> tuple[int, int] | None:
+    """找出右欄固定不動的浮窗（例如手機的電流／溫度監測），回傳它的上下緣 y。
+
+    清單會捲動，卡片上的字不會一直停在同一個位置；同樣的字、同樣的位置出現在四成以上（而且至少 20 張）
+    的清單畫面，就是疊在畫面上的浮窗。日期標題列也固定，所以排除；影片結尾停住時卡片的時間會連續好幾張
+    不動，所以時間樣子的字也排除。
+    """
+    seen: Counter = Counter()
+    boxes: dict[tuple, Line] = {}
+    n = 0
+    for f in frames:
+        lines = to_lines(f)
+        if not is_list_frame(lines):
+            continue
+        n += 1
+        for l in lines:
+            t = nfkc(l.text)
+            if l.x < f['width'] * 0.8 or RE_DATE.search(t) or RE_CLOCK.match(t) or re.search(r'上午|下午', t):
+                continue
+            key = (l.text, round(l.x / 20), round(l.y / 20))
+            seen[key] += 1
+            boxes[key] = l
+    fixed = [boxes[k] for k, c in seen.items() if c >= min_count and c >= n * min_share]
+    if not fixed:
+        return None
+    return min(l.y for l in fixed), max(l.bottom for l in fixed)
+
+
+def parse_frame(frame: dict, year: int, overlay: tuple[int, int] | None = None) -> tuple[list[Observation], bool]:
     """回傳這張畫面裡的完整卡片，以及是否看到清單結束。"""
     lines = to_lines(frame)
     if not is_list_frame(lines):
         return [], False
     width = frame['width']
     right_x = width * 0.8
+    if overlay:
+        # 浮窗上下一行高內的右欄文字不可靠（OCR 會把時間和浮窗的字黏在一起，例：「11:23.5」「9:0②」）
+        top_y, bottom_y = overlay[0] - 60, overlay[1] + 60
+        lines = [l for l in lines if not (l.x >= right_x and l.bottom > top_y and l.y < bottom_y)]
 
     # 日期標題與分隔列：(y, (月, 日))
     dates = []
@@ -278,6 +310,8 @@ def parse_card(
     if not m:
         return None
     product = re.sub(r'[\s·•・.]+$', '', m.group(1)).strip()
+    # 浮窗的字黏到時間後面、掉進車型（例：「A 標準型優步」「8% 標準型優步」）
+    product = re.sub(r'^[A-Za-z0-9%]{1,3}\s*(?=[一-鿿])', '', product)
     duration = int(m.group(2)) * 60 + int(m.group(3))
     distance = float(m.group(4))
 
@@ -367,17 +401,46 @@ def dedupe_key(date: str, start: str, fare: float, distance: float) -> str:
 
 
 def build_trips(observations: list[Observation], year: int, now_ms: int) -> list[dict]:
-    """同一趟（同日、同開始時間）跨畫面投票，回傳 ImportedTrip。"""
-    groups: dict[tuple, list[Observation]] = defaultdict(list)
-    for o in observations:
-        groups[(o.date, o.start)].append(o)
+    """同一趟跨畫面投票，回傳 ImportedTrip。
+
+    同一趟的判斷：同日、同開始時間；或同日、車資＋時長＋公里都一樣、時間差 30 分鐘內。
+    後者是因為時間在右欄，被手機上的浮窗（例如電流監測）蓋到時會讀錯（11:11 → 11:23.5）。
+    """
+    parent = list(range(len(observations)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def minutes(o: Observation) -> int:
+        hh, mm = map(int, o.start.split(':'))
+        return hh * 60 + mm
+
+    by_time: dict[tuple, int] = {}
+    by_spec: dict[tuple, list[int]] = defaultdict(list)
+    for i, o in enumerate(observations):
+        j = by_time.setdefault((o.date, o.start), i)
+        parent[find(i)] = find(j)
+        spec = (o.date, o.fare, o.duration_sec, o.distance_km)
+        for j in by_spec[spec]:
+            if abs(minutes(observations[j]) - minutes(o)) <= 30:
+                parent[find(i)] = find(j)
+        by_spec[spec].append(i)
+
+    groups: dict[int, list[Observation]] = defaultdict(list)
+    for i, o in enumerate(observations):
+        groups[find(i)].append(o)
 
     trips = []
-    for (date, start), obs in groups.items():
+    for obs in groups.values():
+        date = obs[0].date
         month, day = date
         date_str = f'{year:04d}-{month:02d}-{day:02d}'
         hc = [o.conf['head'] for o in obs]
         sc = [o.conf['spec'] for o in obs]
+        start = vote([o.start for o in obs], hc)
         fare = vote([o.fare for o in obs], hc)
         surge = vote([o.surge for o in obs], sc)
         product = vote([o.product for o in obs], sc)
