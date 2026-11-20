@@ -158,6 +158,8 @@ export interface Settings {
   longFareMin: number;
   /** 體感：手機傾斜時雷達跟著立體轉動（噱頭） */
   radarTilt: boolean;
+  /** 家的位置（順路回家用）；null = 還沒設定。只存在自己的手機和 Drive 備份 */
+  home: { lat: number; lon: number } | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -189,6 +191,7 @@ export const DEFAULT_SETTINGS: Settings = {
   wantShort: true,
   longFareMin: 300,
   radarTilt: true,
+  home: null,
 };
 
 /** Drive 備份狀態，存在 kv（不進備份檔） */

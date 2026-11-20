@@ -541,6 +541,26 @@ body { overflow-x: hidden; }
   .radar-sound.on { animation: none; opacity: 0.6; }
 }
 
+/* 順路回家開關：喇叭左邊的小房子，關著淡淡的，開著是綠色實心 */
+.radar-home {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 56px;
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  opacity: 0.45;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.radar-home svg { width: 22px; height: 22px; }
+.radar-home.on { color: var(--accent); opacity: 0.9; }
+
 /* 記錄按鈕：小小的，放在雷達左上角，不搶畫面 */
 .radar-record {
   position: absolute;

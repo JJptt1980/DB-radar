@@ -364,6 +364,37 @@ export function SettingsPage() {
       </section>
 
       <section class="card">
+        <h2>順路回家</h2>
+        <p class="muted small">
+          {app.settings.home
+            ? `已設定家的位置（${app.settings.home.lat.toFixed(4)}, ${app.settings.home.lon.toFixed(4)}）。雷達右上角的小房子點一下，就只推薦回家路上、多繞 3 km 以內的熱點。`
+            : '在家的時候按下面的按鈕，把目前位置設成家。設好後雷達右上角會出現小房子，點一下就只推薦回家路上的熱點。'}
+          位置只存在你的手機和 Drive 備份。
+        </p>
+        <button
+          type="button"
+          class="btn secondary"
+          onClick={() => {
+            const f = lastFix();
+            if (!f) {
+              setMsg({ title: '還沒有定位', body: '等手機抓到 GPS 位置再按一次（可以先開雷達頁等一下）。' });
+              return;
+            }
+            void setRadar({ home: { lat: f.lat, lon: f.lon } }).then(() =>
+              setMsg({ title: '已設定家的位置', body: '之後在雷達點右上角的小房子，就會改推薦順路回家的熱點。' }),
+            );
+          }}
+        >
+          把目前位置設成家
+        </button>
+        {app.settings.home && (
+          <button type="button" class="btn secondary" onClick={() => void setRadar({ home: null })}>
+            清除家的位置
+          </button>
+        )}
+      </section>
+
+      <section class="card">
         <h2>本機匯出／匯入</h2>
         <p class="muted">匯出成 .json.gz 檔，可以存到雲端硬碟或傳給自己。匯入時會合併，不會覆蓋較新的資料。</p>
         <div class="btn-col">

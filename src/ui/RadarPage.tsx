@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { hasEnoughData, recommend, type Candidate, type Recommendation, MIN_TRIPS } from '../analytics/model';
 import { DAY_TYPES, slotLabel, slotOf, type Slot } from '../analytics/slots';
 import { mergedView } from '../analytics/heat';
+import { homeRoute, MAX_DETOUR_KM, type HomeRoute } from '../analytics/home';
 import { compassLabel, distanceM, type LatLon } from '../domain/geo';
 import { lastFix, onFix } from '../sensors/gps';
 import { useHeading } from '../sensors/heading';
@@ -105,11 +106,16 @@ export function RadarPage() {
   useWakeLock(true);
 
   const slot = slotOf(calc.at, new Set(app.settings.holidays));
+  // 順路回家：設了家才有開關；前往接客、載客中不管
+  const home = app.settings.home;
+  const [homeOn, setHomeOn] = useState(() => homeModeOn);
+  const homeActive = homeOn && !!home && app.status.state !== 'enroute' && app.status.state !== 'ontrip';
   // 這個時段全城都沒有任何有資料的格子時，往前後的時段找（12 點沒有就看 11～13 點，再沒有看 10～14 點…），
   // 同一種日子（平日／週五…）找不到再放寬到所有日子，雷達才不會一片空白，也不會變成不分時段的大平均
   const { rec, widened } = useMemo<{ rec: Recommendation | null; widened: string | null }>(() => {
     if (!index) return { rec: null, widened: null };
-    const has = (r: Recommendation) => r.candidates.some((c) => !c.here) || r.far.length > 0 || hasEnoughData(r.here);
+    // 回家模式不推薦原地，所以只有原地有資料不算
+    const has = (r: Recommendation) => r.candidates.some((c) => !c.here) || r.far.length > 0 || (!homeActive && hasEnoughData(r.here));
     const r = recommend(index, slot, calc.pos, app.settings);
     if (has(r)) return { rec: r, widened: null };
     const [day, hourStr] = slot.split(':') as [string, string];
@@ -126,12 +132,24 @@ export function RadarPage() {
       }
     }
     return { rec: r, widened: null };
-  }, [index, slot, calc.pos, app.settings]);
+  }, [index, slot, calc.pos, app.settings, homeActive]);
+  const route = useMemo<HomeRoute | null>(() => (homeActive && rec && home ? homeRoute(rec, calc.pos, home) : null), [homeActive, rec, home, calc.pos]);
   // 附近沒有熱點時，改畫範圍外最近的那些，雷達也放大到看得到它們
   const near = useMemo(() => (rec ? rec.candidates.filter((c) => !c.here).slice(0, MAX_DOTS) : []), [rec]);
   const farOnly = !!rec && near.length === 0 && rec.far.length > 0;
-  const dots = farOnly ? rec!.far.slice(0, MAX_DOTS) : near;
-  const radarMax = rec ? radarMaxKm(app.settings.maxRadarKm, near.length, rec.far.map((c) => c.straightKm)) : app.settings.maxRadarKm;
+  // 回家模式：只畫順路的熱點；沒有順路的就畫多繞最少的那一個，不留空白
+  const homeDots: Candidate[] | null = route ? (route.isOnRoute ? route.onRoute.slice(0, MAX_DOTS) : route.best ? [route.best] : []) : null;
+  const dots = homeDots ?? (farOnly ? rec!.far.slice(0, MAX_DOTS) : near);
+  const radarMax = homeDots
+    ? radarMaxKm(
+        app.settings.maxRadarKm,
+        homeDots.filter((c) => c.straightKm <= app.settings.maxRadarKm).length,
+        homeDots.map((c) => c.straightKm).sort((a, b) => a - b),
+      )
+    : rec
+      ? radarMaxKm(app.settings.maxRadarKm, near.length, rec.far.map((c) => c.straightKm))
+      : app.settings.maxRadarKm;
+  const bestDot = route ? route.best : rec ? (farOnly ? rec.far[0]! : !rec.stay ? rec.best : null) : null;
   const tripCount = index?.tripCount ?? 0;
   const enough = tripCount >= MIN_TRIPS;
   // 雷達上畫出來的所有熱點（含所在這一格，只要有資料）都算龍珠
@@ -157,6 +175,8 @@ export function RadarPage() {
         loading={loading || !index}
         state={app.status.state}
         memeSec={app.settings.memeEnabled ? app.settings.memeIntervalSec : 0}
+        route={route}
+        homeHint={!!home && !homeOn}
       />
       {/* 時段、資料量等小字放在卡片下方，雷達下面整塊留給縮放鈕，雷達才能滿版 */}
       <p class="radar-foot">
@@ -169,7 +189,7 @@ export function RadarPage() {
       </p>
       <RadarCanvas
         dots={enough ? dots : []}
-        best={enough && rec ? (farOnly ? rec.far[0]! : !rec.stay ? rec.best : null) : null}
+        best={enough ? bestDot : null}
         heading={heading.deg}
         maxKm={radarMax}
         sweep={app.settings.radarSweep}
@@ -192,6 +212,23 @@ export function RadarPage() {
             }}
           >
             {RECORD_TEXT[recordAction]}
+          </button>
+        )}
+        {home && (
+          <button
+            type="button"
+            class={`radar-home${homeOn ? ' on' : ''}`}
+            aria-label={homeOn ? '順路回家：開（點一下關掉）' : '順路回家：關（點一下只推薦回家路上的熱點）'}
+            title={homeOn ? '順路回家：開' : '順路回家：關'}
+            onClick={() => {
+              homeModeOn = !homeOn;
+              setHomeOn(homeModeOn);
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 11l9-7 9 7" />
+              <path d="M5 10v10h14V10" fill={homeOn ? 'currentColor' : 'none'} />
+            </svg>
           </button>
         )}
         {/* 靠近龍珠的嗶嗶聲現在會不會響：喇叭＋聲波＝會響；喇叭打叉＝不響（關掉或載客中）。點一下切換開關 */}
@@ -268,6 +305,9 @@ export function RadarPage() {
   );
 }
 
+/** 回家模式開著；換頁回來還記得，重新打開 App 才關掉 */
+let homeModeOn = false;
+
 /** 這一趟（上客事件 id）手動打開了音效；換頁回來還記得，下一趟自動失效 */
 let tripSoundOn: string | null = null;
 
@@ -330,6 +370,8 @@ function TopCard(props: {
   loading: boolean;
   state: DriverState;
   memeSec: number;
+  route: HomeRoute | null;
+  homeHint: boolean;
 }) {
   const now = useTick(1000);
   const meme = props.memeSec > 0 ? memeAt(props.state, now, props.memeSec) : null;
@@ -350,20 +392,25 @@ function TopCard(props: {
         </div>
       )}
       <InfoCard {...props} />
-      {props.state === 'idle' && props.enough && <QuitLine now={now} />}
+      {props.state === 'idle' && props.enough && <QuitLine now={now} homeHint={props.homeHint} />}
     </div>
   );
 }
 
 /** 收工建議的一行精簡版（記錄頁有完整的卡片） */
-function QuitLine({ now }: { now: number }) {
+function QuitLine({ now, homeHint }: { now: number; homeHint: boolean }) {
   const q = useQuitAdvice(now);
   if (!q) return null;
-  return <div class={`radar-quit quit-${q.verdict}`}>收工建議：{q.short}</div>;
+  return (
+    <div class={`radar-quit quit-${q.verdict}`}>
+      收工建議：{q.short}
+      {q.verdict === 'quit' && homeHint && '・可開回家模式'}
+    </div>
+  );
 }
 
-function InfoCard(props:{ rec: Recommendation | null; enough: boolean; heading: number | null; loading: boolean }) {
-  const { rec, enough } = props;
+function InfoCard(props: { rec: Recommendation | null; enough: boolean; heading: number | null; loading: boolean; route: HomeRoute | null }) {
+  const { rec, enough, route } = props;
   if (props.loading) return <section class="radar-card muted">計算中…</section>;
   if (!rec) return <section class="radar-card muted">還沒有資料</section>;
   if (!enough) {
@@ -379,6 +426,7 @@ function InfoCard(props:{ rec: Recommendation | null; enough: boolean; heading: 
       </section>
     );
   }
+  if (route) return <HomeCard route={route} heading={props.heading} />;
   if (rec.best.here && !hasEnoughData(rec.here)) {
     const f = rec.far[0];
     if (f) {
@@ -425,6 +473,41 @@ function InfoCard(props:{ rec: Recommendation | null; enough: boolean; heading: 
       </div>
       <div class="radar-sub">
         預估等 {mins(b.W)}・時薪約 {money(b.score)}
+      </div>
+    </section>
+  );
+}
+
+/** 回家模式的資訊卡：順路第一名；沒有順路的取多繞最少的；完全沒熱點才只指家的方向 */
+function HomeCard({ route, heading }: { route: HomeRoute; heading: number | null }) {
+  const b = route.best;
+  const homeLine = `家在${compassLabel(route.homeBearing)} ${route.homeKm.toFixed(1)} km`;
+  if (!b) {
+    const rot = route.homeBearing - (heading ?? 0);
+    return (
+      <section class="radar-card">
+        <div class="radar-main">
+          <span class="arrow" style={{ transform: `rotate(${rot}deg)` }} aria-hidden="true">
+            ↑
+          </span>
+          直接回家 {compassLabel(route.homeBearing)} {route.homeKm.toFixed(1)} km
+        </div>
+        <div class="radar-sub muted">這個時段沒有可以參考的熱點</div>
+      </section>
+    );
+  }
+  const rot = b.bearing - (heading ?? 0);
+  return (
+    <section class="radar-card">
+      <div class="radar-main">
+        <span class="arrow" style={{ transform: `rotate(${rot}deg)` }} aria-hidden="true">
+          ↑
+        </span>
+        {compassLabel(b.bearing)} {b.straightKm.toFixed(1)} km
+      </div>
+      <div class="radar-sub">
+        {route.isOnRoute ? `順路・多繞 ${b.detourKm.toFixed(1)} km` : `沒有 ${MAX_DETOUR_KM} km 內順路的・最近的要多繞 ${b.detourKm.toFixed(1)} km`}
+        ・時薪約 {money(b.score)}・{homeLine}
       </div>
     </section>
   );
