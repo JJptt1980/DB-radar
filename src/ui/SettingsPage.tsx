@@ -6,7 +6,6 @@ import { lastFix } from '../sensors/gps';
 import { exportToFile, importFromFile } from '../backup/localFile';
 import { BackupFormatError } from '../domain/merge';
 import { Dialog } from './Dialog';
-import { VideoImportCard } from './VideoImport';
 import { UberImportCard } from './UberImport';
 import { DriveCard } from './DriveCard';
 import { isStandalone, notificationPermission } from '../sensors/storage';
@@ -416,8 +415,6 @@ export function SettingsPage() {
           }}
         />
       </section>
-
-      <VideoImportCard />
 
       <UberImportCard />
 

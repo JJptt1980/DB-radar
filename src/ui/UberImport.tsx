@@ -96,6 +96,9 @@ export function UberImportCard() {
         在 Uber App 申請「下載你的資料」，收到 zip 後在這裡選檔。只讀行程、上線狀態、App 定位和獎勵四個檔案；帳號、付款、客服等其他檔案不會載入。
         {counts && (counts.trips || counts.idle) ? ` 已匯入 ${counts.trips} 趟、${counts.idle} 段空車時段。` : ''}
       </p>
+      <p class="muted small">
+        Uber 只保留最近 30 天的定位，雷達靠它知道你在哪裡接到單。建議每個月下載一次，資料才接得上。
+      </p>
       <button type="button" class="btn secondary" disabled={!!status} onClick={() => fileRef.current?.click()}>
         {status ?? '選擇 Uber 資料 zip'}
       </button>
@@ -143,7 +146,7 @@ export function UberImportCard() {
             </dd>
             <dt>有定位的</dt>
             <dd>
-              {s.withPath} 段（App 定位只有最近 30 天）
+              {s.withPath} 段，接單位置會算進雷達的熱點（Uber 只保留最近 30 天）
             </dd>
             {preview.videoUpdates.length > 0 && (
               <>
