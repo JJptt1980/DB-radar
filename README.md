@@ -6,6 +6,10 @@
 
 網址：https://jjptt1980.github.io/DB-radar/
 
+## 問題回報
+
+使用上有任何問題或建議，歡迎到 JJptt Facebook 粉專留言或私訊反應：https://www.facebook.com/1466948699840024
+
 ## 開發
 
 ```bash
