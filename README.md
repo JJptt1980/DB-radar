@@ -38,3 +38,9 @@ gh variable set GOOGLE_CLIENT_ID --body "<用戶端 ID>"
 
 - App 在背景時無法記錄位置（PWA 的限制）。
 - 瀏覽器可能清除網站資料，所以備份很重要。
+
+## 授權
+
+從 2026-11-26 起採用 [PolyForm Noncommercial 1.0.0](LICENSE) 授權：個人、學習、非營利用途免費使用；商業用途需要另外購買商用授權，請到本專案的 GitHub Issues 聯絡。
+
+在這之前的版本沒有附授權條款（保留所有權利）。
